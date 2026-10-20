@@ -54,36 +54,21 @@ En **Ajustes → Comprobar dos direcciones** puedes pegar dos URL y ver qué se 
 - **Teclado:** `Alt+Mayús+D` abre la ventanita. Dentro: `/` busca, `↑ ↓` te mueves, `Intro` va a la pestaña, `Supr` la cierra y `K` conserva solo esa.
 - **Exportar e importar** los ajustes.
 
-## Instalación (privada, sin publicarla)
+## Instalación y actualizaciones automáticas
 
-Firefox normal solo instala de forma permanente las extensiones firmadas por Mozilla. Tienes tres opciones:
+1. Descarga **[duplicados.xpi](https://github.com/drugabox/duplicados-firefox/releases/latest/download/duplicados.xpi)** (la última versión firmada por Mozilla).
+2. Arrástralo a una ventana de Firefox y acepta los permisos. Queda instalada de forma permanente.
+3. Opcional: `about:addons` → Duplicados → *Ejecutar en ventanas privadas* → Permitir.
 
-### A0) Desde la web, sin instalar nada
+**Las actualizaciones son automáticas.** Cada cambio en `main` lanza la tarea `.github/workflows/publicar.yml`, que:
+- pasa las pruebas y el validador de Mozilla;
+- pone la versión sola (`1.1.<número de ejecución>`);
+- la firma con tu cuenta de Mozilla como «no listada», con los secretos `AMO_JWT_ISSUER` y `AMO_JWT_SECRET` del repositorio;
+- la publica en *Releases* junto a `updates.json`.
 
-1. Descarga `duplicados-X.Y.Z.zip` (o créalo comprimiendo el **contenido** de la carpeta, con `manifest.json` en la raíz del ZIP, **no** la carpeta entera ni el `manifest.json` suelto).
-2. https://addons.mozilla.org/developers/ → *Enviar un nuevo complemento* → **Por tu cuenta** → sube el ZIP.
-3. Al terminar la validación, descarga el `.xpi` firmado y arrástralo a Firefox.
+Firefox consulta `updates.json` una vez al día y se actualiza solo. Para forzarlo: `about:addons` → ⚙ → *Buscar actualizaciones*.
 
-### A) Firmarla como «no listada» con la API
-
-Así es privada: no aparece en la tienda, nadie la ve y nadie la revisa a mano. Mozilla solo la firma automáticamente.
-
-1. Crea una cuenta en https://addons.mozilla.org y genera tus claves en *Herramientas → Gestionar claves de API*.
-2. En esta carpeta ejecuta:
-   ```bash
-   npx web-ext sign --channel=unlisted --api-key=TU_CLAVE --api-secret=TU_SECRETO
-   ```
-3. Te descarga un `.xpi` firmado en `web-ext-artifacts/`. Arrástralo a Firefox. Se actualiza igual: sube el número de `version` en `manifest.json` y vuelve a firmar.
-
-### B) Firefox Developer Edition, Nightly o ESR
-
-En `about:config` pon `xpinstall.signatures.required` a `false`. Después, `npm run build` y abre el `.zip` de `dist/` desde `about:addons` → ⚙ → *Instalar complemento desde archivo*.
-
-### C) Temporal, para probar
-
-`about:debugging#/runtime/this-firefox` → *Cargar complemento temporal* → elige `manifest.json`. Se quita al cerrar Firefox.
-
-Para que funcione también en ventanas privadas: `about:addons` → Duplicados → *Ejecutar en ventanas privadas* → Permitir.
+Para probar sin firmar: `about:debugging#/runtime/this-firefox` → *Cargar complemento temporal* → `manifest.json`.
 
 ## Desarrollo
 

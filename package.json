@@ -11,6 +11,13 @@
   },
   "webExt": {
     "sourceDir": ".",
-    "ignoreFiles": ["test", "package.json", "README.md", "dist", "web-ext-artifacts"]
+    "ignoreFiles": [
+      "test",
+      "package.json",
+      "README.md",
+      "dist",
+      "web-ext-artifacts",
+      ".github"
+    ]
   }
 }
