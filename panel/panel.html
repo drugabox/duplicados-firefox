@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Duplicados</title>
 	<link rel="icon" href="../icons/icon.svg">
+	<link rel="stylesheet" href="../lib/theme.css">
 	<link rel="stylesheet" href="panel.css">
 </head>
 <body>
@@ -56,7 +57,7 @@
 				<h2>Al abrir una pestaña que ya estaba abierta</h2>
 				<div class="choices">
 					<label class="choice"><input type="radio" name="onDuplicate" value="panel">
-						<span><strong>Avisarme abriendo la lista</strong><small>Se abre esta ventana y salta directamente a la pareja duplicada. (Recomendado)</small></span></label>
+						<span><strong>Avisarme abriendo la ventanita</strong><small>Se abre la ventanita del icono y salta directamente a la pareja duplicada. (Recomendado)</small></span></label>
 					<label class="choice"><input type="radio" name="onDuplicate" value="notify">
 						<span><strong>Solo una notificación</strong><small>Un aviso discreto del sistema; al pulsarlo se abre la lista.</small></span></label>
 					<label class="choice"><input type="radio" name="onDuplicate" value="badge">
@@ -106,10 +107,25 @@
 			<section class="card">
 				<h2>Al pulsar el icono</h2>
 				<div class="seg">
-					<label><input type="radio" name="clickAction" value="window"><span>Ventana ajustable</span></label>
+					<label><input type="radio" name="clickAction" value="popup"><span>Ventanita</span></label>
+					<label><input type="radio" name="clickAction" value="tab"><span>Esta página en una pestaña</span></label>
 					<label><input type="radio" name="clickAction" value="sidebar"><span>Panel lateral</span></label>
 				</div>
-				<p class="hint">La ventana se puede redimensionar y mover a tu gusto; recuerda su tamaño y posición. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
+				<p class="hint">La ventanita muestra lo básico. Para cambiar su tamaño, arrastra la barra de abajo (alto) o la esquina inferior derecha (alto y ancho); con doble clic vuelve al tamaño normal. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
+				<div class="grid2">
+					<div class="field">
+						<label class="label" for="popupWidth">Ancho de la ventanita <output id="popupWidthOut"></output></label>
+						<input type="range" id="popupWidth" name="popupWidth" min="300" max="780" step="10">
+					</div>
+					<div class="field">
+						<label class="label" for="popupHeight">Alto de la lista <output id="popupHeightOut"></output></label>
+						<input type="range" id="popupHeight" name="popupHeight" min="120" max="540" step="10">
+					</div>
+					<div class="field">
+						<label class="label" for="popupFontSize">Texto de la ventanita <output id="popupFontSizeOut"></output></label>
+						<input type="range" id="popupFontSize" name="popupFontSize" min="11" max="18" step="1">
+					</div>
+				</div>
 			</section>
 
 			<section class="card">
@@ -223,6 +239,7 @@
 
 	<script src="../lib/normalize.js"></script>
 	<script src="../lib/settings.js"></script>
+	<script src="../lib/theme.js"></script>
 	<script src="panel.js"></script>
 </body>
 </html>

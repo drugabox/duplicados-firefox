@@ -41,8 +41,9 @@ En **Ajustes → Comprobar dos direcciones** puedes pegar dos URL y ver qué se 
 
 ## Funciones
 
-- **Aviso al abrir un duplicado:** se abre la lista y salta a esa pareja: la resalta, la centra y marca la pestaña «Recién abierta». En su lugar puedes elegir una notificación del sistema, no avisar, o cerrar la nueva automáticamente (y deshacer).
-- **Ventana ajustable:** el icono abre una ventana que puedes redimensionar y mover a tu gusto, y recuerda su tamaño y posición. También funciona como **panel lateral** de Firefox.
+- **Aviso al abrir un duplicado:** se abre la ventanita del icono y salta a esa pareja: la resalta y marca la pestaña «nueva». Necesita Firefox 149 o posterior; en versiones anteriores se abre una ventana aparte. En su lugar puedes elegir una notificación del sistema, no avisar, o cerrar la nueva automáticamente (y deshacer).
+- **Ventanita del icono, limpia y directa** (como la original): botón para cerrar duplicados, la lista con lo que cambia entre cada pareja y un selector de qué hacer al abrir un duplicado. Se estira arrastrando la barra de abajo (alto) o la esquina (alto y ancho), y recuerda el tamaño. Doble clic en la barra la devuelve al tamaño normal.
+- **Página completa en su propia pestaña** (botón ⤢ de la ventanita, o clic derecho en el icono): todos los datos, todos los ajustes y la ayuda. También funciona como **panel lateral** de Firefox.
 - **Lista clara:** resalta en cada URL la parte que cambia, explica el motivo, indica qué pestaña se conservará (★) y muestra la ventana, el contenedor, si está fijada, dormida o sonando.
 - **Cerrar duplicados** de golpe o por grupo, **conservar solo esta**, **Deshacer** (reabre con su historial).
 - **Mantener todas:** deja de avisar de esa página durante la sesión. Desde el clic derecho en una pestaña: «No es duplicada» y «Ver duplicados de esta pestaña».
@@ -50,14 +51,20 @@ En **Ajustes → Comprobar dos direcciones** puedes pegar dos URL y ver qué se 
 - **Respeta las sesiones:** las ventanas privadas y, por defecto, los contenedores distintos nunca se mezclan.
 - **Lista de exclusión** de webs, con comodines.
 - **Temas:** Automático, Claro, Oscuro, Como Firefox (copia los colores de tu tema), Sepia, Lavanda, Nord, Bosque, Alto contraste y Personalizado (8 colores). Además puedes elegir el color de acento, la densidad, el tamaño del texto, el redondeo de las esquinas, los iconos y las URL completas o abreviadas. Los cambios se ven al instante.
-- **Teclado:** `Alt+Mayús+D` abre la lista. Dentro: `/` busca, `↑ ↓` te mueves, `Intro` va a la pestaña, `Supr` la cierra y `K` conserva solo esa.
+- **Teclado:** `Alt+Mayús+D` abre la ventanita. Dentro: `/` busca, `↑ ↓` te mueves, `Intro` va a la pestaña, `Supr` la cierra y `K` conserva solo esa.
 - **Exportar e importar** los ajustes.
 
 ## Instalación (privada, sin publicarla)
 
 Firefox normal solo instala de forma permanente las extensiones firmadas por Mozilla. Tienes tres opciones:
 
-### A) Firmarla como «no listada» (recomendado)
+### A0) Desde la web, sin instalar nada
+
+1. Descarga `duplicados-X.Y.Z.zip` (o créalo comprimiendo el **contenido** de la carpeta, con `manifest.json` en la raíz del ZIP, **no** la carpeta entera ni el `manifest.json` suelto).
+2. https://addons.mozilla.org/developers/ → *Enviar un nuevo complemento* → **Por tu cuenta** → sube el ZIP.
+3. Al terminar la validación, descarga el `.xpi` firmado y arrástralo a Firefox.
+
+### A) Firmarla como «no listada» con la API
 
 Así es privada: no aparece en la tienda, nadie la ve y nadie la revisa a mano. Mozilla solo la firma automáticamente.
 
@@ -85,7 +92,9 @@ manifest.json        Manifiesto (Firefox 115+)
 background.js        Vigila pestañas, agrupa, avisa, cierra y deshace
 lib/normalize.js     Motor de detección y explicaciones (sin dependencias)
 lib/settings.js      Ajustes por defecto y lista de exclusión
-panel/               Interfaz: lista, ajustes y ayuda (ventana, panel lateral y opciones)
+lib/theme.css/.js    Temas compartidos por la ventanita y la página
+popup/               Ventanita del icono (lo básico)
+panel/               Página completa: lista detallada, ajustes y ayuda (pestaña, panel lateral)
 test/                Pruebas del motor con casos reales
 ```
 

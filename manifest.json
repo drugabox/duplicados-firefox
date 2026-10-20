@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Duplicados",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Detecta pestañas duplicadas con precisión, avisa al abrirlas y explica por qué lo son.",
   "default_locale": "es",
   "icons": {
@@ -29,7 +29,8 @@
   "browser_action": {
     "default_icon": "icons/icon.svg",
     "default_title": "Duplicados",
-    "default_area": "navbar"
+    "default_area": "navbar",
+    "default_popup": "popup/popup.html"
   },
   "sidebar_action": {
     "default_title": "Duplicados",
@@ -38,7 +39,7 @@
     "open_at_install": false
   },
   "options_ui": {
-    "page": "panel/panel.html?mode=options#ajustes",
+    "page": "panel/panel.html?mode=tab#ajustes",
     "open_in_tab": true
   },
   "permissions": [
@@ -52,11 +53,14 @@
     "theme"
   ],
   "commands": {
-    "open-panel": {
+    "_execute_browser_action": {
       "suggested_key": {
         "default": "Alt+Shift+D"
       },
-      "description": "Abrir la lista de duplicados"
+      "description": "Abrir la ventanita de duplicados"
+    },
+    "open-page": {
+      "description": "Abrir la página completa de duplicados"
     },
     "close-safe": {
       "description": "Cerrar todos los duplicados seguros"

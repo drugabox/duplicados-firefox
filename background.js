@@ -208,29 +208,60 @@ browser.notifications.onClicked.addListener((id) => {
 
 const broadcast = (msg) => { for (const p of ports) { try { p.postMessage(msg); } catch { /* cerrado */ } } };
 
+const POPUP_URL = "popup/popup.html";
+const PAGE_URL = browser.runtime.getURL("panel/panel.html");
+
+// Avisar de un duplicado: se abre la ventanita del icono (Firefox 149+ lo permite sin pulsar nada).
+// Si ya está abierta (o el panel lateral), solo salta a la pareja. Si no se puede, ventana aparte.
 const openPanel = async (focus) => {
 	if (focus) pendingFocus = focus;
+	const shown = [...ports].find(p => p.kind === "popup") || [...ports].find(p => p.kind === "sidebar" || p.kind === "window");
+	if (shown) {
+		if (pendingFocus) { shown.postMessage({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
+		if (shown.kind === "window" && panelWindowId !== null) browser.windows.update(panelWindowId, { focused: true }).catch(() => {});
+		return;
+	}
+	try {
+		if (settings.clickAction !== "popup") await browser.browserAction.setPopup({ popup: POPUP_URL });
+		await browser.browserAction.openPopup();
+		return;
+	} catch {
+		/* Firefox antiguo o botón oculto: ventana aparte */
+	} finally {
+		if (settings.clickAction !== "popup") setTimeout(() => browser.browserAction.setPopup({ popup: "" }), 1500);
+	}
+	await openWindow();
+};
+
+const openWindow = async () => {
 	if (panelWindowId !== null) {
 		try {
 			const w = await browser.windows.get(panelWindowId);
 			await browser.windows.update(panelWindowId, w.state === "minimized" ? { focused: true, state: "normal" } : { focused: true });
-			if (pendingFocus) { broadcast({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
 			return;
 		} catch { panelWindowId = null; }
 	}
-	// Si el panel lateral está abierto, basta con enfocar ahí.
-	if (focus && [...ports].some(p => p.isSidebar)) {
-		broadcast({ type: "focus", focus: pendingFocus });
-		pendingFocus = null;
-		if (settings.clickAction === "sidebar") return;
-	}
 	const { panelBounds } = await browser.storage.local.get("panelBounds");
-	const b = panelBounds || { width: 600, height: 780 };
-	const opts = { type: "popup", url: browser.runtime.getURL("panel/panel.html?mode=window"), width: b.width, height: b.height };
+	const b = panelBounds || { width: 420, height: 640 };
+	const opts = { type: "popup", url: PAGE_URL + "?mode=window", width: b.width, height: b.height };
 	if (Number.isFinite(b.left) && Number.isFinite(b.top)) { opts.left = b.left; opts.top = b.top; }
 	const w = await browser.windows.create(opts);
 	panelWindowId = w.id;
 };
+
+// Página completa en su propia pestaña (lista detallada, ajustes y ayuda).
+const openPage = async (view) => {
+	const existing = (await browser.tabs.query({})).find(t => t.url && t.url.startsWith(PAGE_URL) && !t.url.includes("mode=window") && !t.url.includes("mode=sidebar"));
+	const url = PAGE_URL + "?mode=tab#" + (view || "lista");
+	if (existing) {
+		await browser.tabs.update(existing.id, view ? { active: true, url } : { active: true });
+		await browser.windows.update(existing.windowId, { focused: true });
+	} else {
+		await browser.tabs.create({ url });
+	}
+};
+
+const applyClickAction = () => browser.browserAction.setPopup({ popup: settings.clickAction === "popup" ? POPUP_URL : "" });
 
 browser.windows.onRemoved.addListener((id) => { if (id === panelWindowId) panelWindowId = null; });
 
@@ -244,10 +275,13 @@ browser.runtime.onConnect.addListener((port) => {
 const handlePanelMessage = async (port, msg) => {
 	switch (msg.cmd) {
 		case "hello":
-			port.isSidebar = !!msg.sidebar;
-			if (msg.windowId && !msg.sidebar) panelWindowId = msg.windowId;
+			port.kind = msg.kind || "page";
+			if (port.kind === "window" && msg.windowId) panelWindowId = msg.windowId;
 			port.postMessage({ type: "state", state });
 			if (pendingFocus) { port.postMessage({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
+			break;
+		case "openPage":
+			openPage(msg.view);
 			break;
 		case "bounds":
 			browser.storage.local.set({ panelBounds: msg.bounds });
@@ -400,13 +434,14 @@ browser.tabs.onActivated.addListener(() => scheduleCompute(300));
 
 // ------------------------------------------------------------------ icono, atajos y menús
 
+// Solo se usa si el icono no abre la ventanita (ajuste «Al pulsar el icono»).
 browser.browserAction.onClicked.addListener(() => {
 	if (settings.clickAction === "sidebar") browser.sidebarAction.toggle();
-	else openPanel();
+	else openPage();
 });
 
 browser.commands.onCommand.addListener((cmd) => {
-	if (cmd === "open-panel") openPanel();
+	if (cmd === "open-page") openPage();
 	else if (cmd === "close-safe") closeAllSafe();
 });
 
@@ -415,12 +450,12 @@ const setupMenus = () => {
 	browser.menus.create({ id: "show", title: "Ver duplicados de esta pestaña", contexts: ["tab"] });
 	browser.menus.create({ id: "ignore", title: "No es duplicada: ignorar esta pestaña", contexts: ["tab"] });
 	browser.menus.create({ id: "close-safe", title: "Cerrar todos los duplicados seguros", contexts: ["browser_action"] });
+	browser.menus.create({ id: "page", title: "Abrir en una pestaña", contexts: ["browser_action"] });
 	browser.menus.create({ id: "sidebar", title: "Abrir en el panel lateral", contexts: ["browser_action"] });
-	browser.menus.create({ id: "window", title: "Abrir en ventana ajustable", contexts: ["browser_action"] });
 };
 browser.menus.onClicked.addListener((info, tab) => {
 	if (info.menuItemId === "sidebar") { browser.sidebarAction.open(); return; }
-	if (info.menuItemId === "window") openPanel();
+	if (info.menuItemId === "page") openPage();
 	else if (info.menuItemId === "close-safe") closeAllSafe();
 	else if (info.menuItemId === "ignore" && tab) { ignoredTabs.add(tab.id); scheduleCompute(0); }
 	else if (info.menuItemId === "show" && tab) {
@@ -434,6 +469,7 @@ browser.menus.onClicked.addListener((info, tab) => {
 const applySettings = (s) => {
 	settings = s;
 	exclusions = DupSettings.compileExclusions(s.exclusions);
+	applyClickAction();
 	cache.clear();
 };
 

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es" data-theme="auto">
+<head>
+	<meta charset="utf-8">
+	<title>Duplicados</title>
+	<link rel="stylesheet" href="../lib/theme.css">
+	<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+	<header class="head">
+		<strong>Duplicados</strong>
+		<span id="summary" class="summary"></span>
+		<button id="openTab" class="icon" title="Abrir en una pestaña (más datos y ajustes)" aria-label="Abrir en una pestaña">
+			<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+		</button>
+		<button id="openSettings" class="icon" title="Ajustes" aria-label="Ajustes">
+			<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+		</button>
+	</header>
+
+	<div class="bar">
+		<button id="closeAll" class="primary" disabled>Cerrar duplicados</button>
+		<button id="undo" class="icon" hidden title="Deshacer: reabrir lo último cerrado" aria-label="Deshacer">
+			<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+		</button>
+	</div>
+
+	<div id="note" class="note" hidden></div>
+	<div id="list" class="list" tabindex="-1"></div>
+
+	<footer class="foot">
+		<label for="onDuplicate">Al abrir un duplicado</label>
+		<select id="onDuplicate">
+			<option value="panel">Avisarme aquí</option>
+			<option value="notify">Notificación</option>
+			<option value="badge">No avisar</option>
+			<option value="close">Cerrar la nueva</option>
+		</select>
+	</footer>
+	<div id="grip" class="grip" title="Arrastra para cambiar el tamaño" aria-hidden="true"></div>
+
+	<script src="../lib/settings.js"></script>
+	<script src="../lib/theme.js"></script>
+	<script src="popup.js"></script>
+</body>
+</html>
