@@ -14,6 +14,10 @@ let query = "";
 let pendingFocus = null;
 let highlightTabId = null;
 let lastRenderSig = "";
+let reasonFilter = null;
+const REASONS = DupNormalize.REASONS;
+const PRESET_NAMES = { inequivoco: "Inequívoco", original: "Como la original", personalizado: "Personalizado" };
+const profileNow = () => DupSettings.profileOf(settings);
 
 // Crea elementos sin innerHTML: los títulos de las webs nunca se interpretan como HTML.
 const h = (tag, attrs = {}, ...children) => {
@@ -57,6 +61,8 @@ port.onMessage.addListener((msg) => {
 		if (pendingFocus) applyFocus(pendingFocus);
 	} else if (msg.type === "focus") {
 		applyFocus(msg.focus);
+	} else if (msg.type === "compare") {
+		renderCompare(msg.result);
 	}
 });
 
@@ -138,6 +144,7 @@ const visibleGroups = () => {
 		if (filter === "ignorado") return g.ignored;
 		if (g.ignored) return false;
 		if (filter !== "todos" && g.level !== filter) return false;
+		if (reasonFilter && !(g.codes || []).includes(reasonFilter)) return false;
 		return matchesQuery(g);
 	}).sort((a, b) => (a.level === b.level ? 0 : a.level === "seguro" ? -1 : 1));
 };
@@ -154,11 +161,12 @@ const renderStats = () => {
 
 const render = () => {
 	if (!state) return;
-	const sig = JSON.stringify([state, filter, query, highlightTabId, settings.urlDisplay, settings.showFavicons]);
+	const sig = JSON.stringify([state, filter, query, highlightTabId, reasonFilter, settings.urlDisplay, settings.showFavicons]);
 	if (sig === lastRenderSig) return;
 	lastRenderSig = sig;
 
 	renderStats();
+	renderDiag();
 	const closable = state.groups.filter(g => g.level === "seguro" && !g.ignored).reduce((n, g) => n + g.tabs.filter(t => t.id !== g.keepId && !t.pinned).length, 0);
 	const btn = $("#closeAll");
 	btn.disabled = closable === 0;
@@ -258,6 +266,50 @@ const renderGroup = (g, wins, multiWin) => {
 	return h("article", { class: `group ${g.level}${g.ignored ? " ignored" : ""}`, dataset: { id: g.id } }, head, why, ul);
 };
 
+// ------------------------------------------------------------------ diagnóstico: por qué se agrupan
+
+const renderDiag = () => {
+	const d = $("#diag");
+	const entries = Object.entries(state.reasons || {}).sort((a, b) => b[1] - a[1]);
+	d.hidden = !entries.length && !reasonFilter;
+	$("#diagTitle").textContent = `¿Por qué se agrupan? · ${state.stats.safe} grupo${state.stats.safe === 1 ? "" : "s"}`;
+	$("#diagMode").textContent = "Modo: " + (PRESET_NAMES[settings.preset] || settings.preset);
+	$("#reasons").replaceChildren(...entries.map(([code, n]) =>
+		h("button", { type: "button", class: "reason" + (reasonFilter === code ? " on" : "") + (code === "title" || code === "titleSimilar" || code === "queryIgnored" || code === "pathIgnored" ? " risky" : ""),
+			"aria-pressed": String(reasonFilter === code), title: "Ver solo estos grupos",
+			onclick: () => { reasonFilter = reasonFilter === code ? null : code; render(); } },
+		h("span", {}, REASONS[code] || code), h("b", {}, n))),
+		...(reasonFilter ? [h("button", { type: "button", class: "btn small ghost", onclick: () => { reasonFilter = null; render(); } }, "Quitar filtro")] : []));
+};
+
+const renderCompare = (r) => {
+	const box = $("#compare");
+	box.replaceChildren(...Object.entries(r).map(([k, v]) =>
+		h("div", { class: "cmp" + (k === settings.preset ? " current" : "") },
+			h("span", {}, PRESET_NAMES[k]),
+			h("b", {}, `${v.extra} sobrante${v.extra === 1 ? "" : "s"}`),
+			h("small", {}, `${v.groups} grupos${v.doubtful ? ` · ${v.doubtful} dudosos` : ""}`),
+			k !== settings.preset ? h("button", { type: "button", class: "btn small ghost", onclick: () => { DupSettings.save({ preset: k }); toast("Modo cambiado a «" + PRESET_NAMES[k] + "»."); } }, "Usar") : h("small", { class: "now" }, "en uso"))));
+};
+$("#compareBtn").addEventListener("click", () => send({ cmd: "compare" }));
+
+// Informe de texto con todos los grupos y su motivo (para revisarlo o compartirlo).
+$("#report").addEventListener("click", async () => {
+	const lines = [`Duplicados · modo ${PRESET_NAMES[settings.preset]} · ${state.stats.extra} sobrantes · ${state.stats.doubtful} dudosos · ${state.stats.tabs} pestañas`, ""];
+	for (const g of visibleGroups()) {
+		lines.push(`[${g.level === "seguro" ? "DUPLICADO" : "DUDOSO"}] ${g.title} — ${(g.codes || []).map(c => REASONS[c] || c).join(", ")}`);
+		g.tabs.forEach(t => lines.push("   " + t.url));
+		lines.push("");
+	}
+	const text = lines.join("\n");
+	try { await navigator.clipboard.writeText(text); toast("Informe copiado al portapapeles."); }
+	catch {
+		const a = h("a", { href: URL.createObjectURL(new Blob([text], { type: "text/plain" })), download: "duplicados-informe.txt" });
+		document.body.append(a); a.click(); a.remove();
+		toast("Informe descargado.");
+	}
+});
+
 // Saltar a la pareja recién abierta
 const applyFocus = (f) => {
 	if (!f) return;
@@ -302,7 +354,7 @@ const showBanner = (text) => {
 let toastTimer = null;
 const toast = (text, action) => {
 	const t = $("#toast");
-	t.replaceChildren(h("span", {}, text), action ? h("button", { onclick: () => { action.fn(); t.hidden = true; } }, action.label) : null);
+	t.replaceChildren(...[h("span", {}, text), action ? h("button", { onclick: () => { action.fn(); t.hidden = true; } }, action.label) : null].filter(Boolean));
 	t.hidden = false;
 	clearTimeout(toastTimer);
 	toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
@@ -395,29 +447,81 @@ const save = (patch, delay = 0) => {
 const form = $("#settings");
 form.addEventListener("submit", (e) => e.preventDefault());
 
+const isSetting = (name) => name && (name in DupSettings.DEFAULTS || name.startsWith("m."));
+const valueOf = (name) => (name.startsWith("m.") ? profileNow()[name.slice(2)] : settings[name]);
+
 const fillForm = () => {
 	for (const el of form.elements) {
-		if (!el.name || !(el.name in DupSettings.DEFAULTS) || el === document.activeElement) continue;
-		const v = settings[el.name];
+		if (!isSetting(el.name) || el === document.activeElement) continue;
+		const v = valueOf(el.name);
 		if (el.type === "radio") el.checked = el.value === String(v);
 		else if (el.type === "checkbox") el.checked = !!v;
 		else if (el.type === "color") el.value = v || getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#4f6bed";
 		else el.value = v;
 	}
 	for (const k of ["fontSize", "radius", "popupWidth", "popupHeight", "popupFontSize"]) $("#" + k + "Out").textContent = settings[k] + " px";
+	$("#m_titleThresholdOut").textContent = profileNow().titleThreshold + " %";
+	$("#m_titleThreshold").closest(".opt-field").hidden = profileNow().titleMode !== "similar";
+	if (settings.preset === "personalizado") $("#advanced").open = true;
+	renderPresetSummary();
 	renderThemes();
 };
 
+// Resumen en lenguaje llano de lo que hace el modo elegido.
+const renderPresetSummary = () => {
+	const p = profileNow();
+	const yes = [], no = [];
+	(p.siteRules ? yes : no).push("reglas inteligentes por web (YouTube, Instagram, X…)");
+	(p.dropTracking ? yes : no).push("quitar parámetros de rastreo");
+	(p.ignoreScheme ? yes : no).push("http = https");
+	(p.ignoreWww ? yes : no).push("con y sin www");
+	(p.ignoreMobile ? yes : no).push("versión móvil = normal");
+	(p.ignoreCase ? yes : no).push("ignorar mayúsculas");
+	if (p.hashMode === "ignore") yes.push("ignorar lo que va tras #");
+	else no.push(p.hashMode === "doubt" ? "ignorar #sección (pasa a dudoso)" : "ignorar lo que va tras #");
+	if (p.queryMode === "ignore") yes.push("ignorar todos los parámetros ⚠");
+	if (p.ignorePath) yes.push("ignorar la ruta ⚠");
+	if (p.ignoreParams.trim()) yes.push("ignorar: " + p.ignoreParams.trim());
+	if (p.urlRules.trim()) yes.push(p.urlRules.trim().split(/\n/).length + " regla(s) propia(s)");
+	const tm = { off: null, or: "unir por título idéntico", and: "exigir además el mismo título", similar: `unir por título parecido (≥ ${p.titleThreshold} %)` }[p.titleMode];
+	if (tm) yes.push(tm); else no.push("usar el título");
+	(p.showDoubtful ? yes : no).push("mostrar dudosos");
+	$("#presetSummary").replaceChildren(
+		h("div", { class: "sum-col" }, h("b", {}, "Se considera la misma página"), h("ul", {}, yes.map(x => h("li", { class: "yes" }, x)))),
+		h("div", { class: "sum-col" }, h("b", {}, "No se hace"), h("ul", {}, no.map(x => h("li", { class: "no" }, x)))));
+};
+
+$("#copyPreset").addEventListener("click", () => {
+	save({ preset: "personalizado", match: { ...DupNormalize.PRESETS.inequivoco } });
+	setTimeout(fillForm, 50);
+});
+
 form.addEventListener("input", (e) => {
 	const el = e.target;
-	if (!el.name || !(el.name in DupSettings.DEFAULTS)) return;
+	if (!isSetting(el.name)) return;
 	let v;
 	if (el.type === "checkbox") v = el.checked;
 	else if (el.type === "range") v = Number(el.value);
 	else v = el.value;
+	const slow = el.tagName === "TEXTAREA" || el.type === "range" || el.type === "color" || el.type === "text" || el.classList.contains("input");
+	if (el.name.startsWith("m.")) {
+		// Tocar una opción avanzada = pasar a Personalizado, partiendo del modo que tenías.
+		const key = el.name.slice(2);
+		if (key === "titleThreshold") $("#m_titleThresholdOut").textContent = v + " %";
+		const wasPreset = settings.preset;
+		save({ preset: "personalizado", match: { ...profileNow(), [key]: v } }, slow ? 500 : 0);
+		if (wasPreset !== "personalizado") {
+			$$('input[name="preset"]').forEach(r => { r.checked = r.value === "personalizado"; });
+			toast(`Pasas a «Personalizado» (partiendo de «${PRESET_NAMES[wasPreset]}»).`);
+		}
+		renderPresetSummary();
+		$("#m_titleThreshold").closest(".opt-field").hidden = profileNow().titleMode !== "similar";
+		runTest();
+		return;
+	}
 	if (el.type === "range") $("#" + el.name + "Out").textContent = v + " px";
-	save({ [el.name]: v }, el.tagName === "TEXTAREA" || el.type === "range" || el.type === "color" ? 400 : 0);
-	if (el.name === "anchorsDistinct") runTest();
+	save({ [el.name]: v }, slow ? 400 : 0);
+	if (el.name === "preset") { setTimeout(fillForm, 0); runTest(); }
 });
 
 $("#accentReset").addEventListener("click", () => { save({ accent: "" }); setTimeout(fillForm, 50); });
@@ -427,12 +531,13 @@ const runTest = () => {
 	const a = $("#testA").value.trim(), b = $("#testB").value.trim();
 	const out = $("#testResult");
 	if (!a || !b) { out.hidden = true; return; }
-	const r = DupNormalize.explain(a, b, { anchorsDistinct: settings.anchorsDistinct });
-	const A = DupNormalize.analyze(a, { anchorsDistinct: settings.anchorsDistinct }), B = DupNormalize.analyze(b, { anchorsDistinct: settings.anchorsDistinct });
+	const prof = profileNow();
+	const r = DupNormalize.explain(a, b, prof);
+	const A = DupNormalize.analyze(a, prof), B = DupNormalize.analyze(b, prof);
 	const cls = r.level === "dudoso" ? "doubt" : r.level === "distinto" ? "neutral" : "safe";
 	const label = { exacto: "Idénticas", seguro: "Duplicado", dudoso: "Dudoso", distinto: "Distintas" }[r.level];
 	out.replaceChildren(
-		h("div", { class: "row" }, h("span", { class: "pill " + cls }, label), h("strong", {}, r.title)),
+		h("div", { class: "row" }, h("span", { class: "pill " + cls }, label), h("strong", {}, r.title), h("small", { class: "hint" }, " · modo " + PRESET_NAMES[settings.preset])),
 		r.details.length ? h("ul", {}, r.details.map(d => h("li", {}, d))) : null,
 		A.ok && B.ok ? h("p", { class: "hint" }, "Lo que se compara: ", h("br"), h("code", {}, A.strict), h("br"), h("code", {}, B.strict)) : null
 	);

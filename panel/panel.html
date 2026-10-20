@@ -41,6 +41,18 @@
 			</div>
 		</div>
 		<div id="banner" class="banner" hidden></div>
+		<details id="diag" class="diag" hidden>
+			<summary><span id="diagTitle">¿Por qué se agrupan?</span><span class="diag-mode" id="diagMode"></span></summary>
+			<div class="diag-body">
+				<p class="hint">Cuántos grupos hay por cada motivo. Pulsa uno para ver solo esos. Si un motivo no te convence, cámbialo en Ajustes → Cómo se detectan.</p>
+				<div id="reasons" class="reasons"></div>
+				<div class="compare" id="compare"></div>
+				<div class="row wrap">
+					<button type="button" class="btn ghost small" id="compareBtn">Comparar los tres modos</button>
+					<button type="button" class="btn ghost small" id="report">Copiar informe</button>
+				</div>
+			</div>
+		</details>
 		<div id="groups" class="groups"></div>
 		<div id="empty" class="empty" hidden>
 			<div class="empty-icon">✓</div>
@@ -57,7 +69,7 @@
 				<h2>Al abrir una pestaña que ya estaba abierta</h2>
 				<div class="choices">
 					<label class="choice"><input type="radio" name="onDuplicate" value="panel">
-						<span><strong>Avisarme abriendo la ventanita</strong><small>Se abre la ventanita del icono y salta directamente a la pareja duplicada. (Recomendado)</small></span></label>
+						<span><strong>Avisarme abriendo la lista</strong><small>Se abre la ventanita del icono (o la ventana grande, si es lo que usas) y salta directamente a la pareja duplicada. (Recomendado)</small></span></label>
 					<label class="choice"><input type="radio" name="onDuplicate" value="notify">
 						<span><strong>Solo una notificación</strong><small>Un aviso discreto del sistema; al pulsarlo se abre la lista.</small></span></label>
 					<label class="choice"><input type="radio" name="onDuplicate" value="badge">
@@ -68,8 +80,95 @@
 				<label class="switch"><input type="checkbox" name="alertDoubtful"><span></span>Avisar también de los casos dudosos</label>
 			</section>
 
+			<section class="card" id="detection">
+				<h2>Cómo se detectan los duplicados</h2>
+				<div class="choices">
+					<label class="choice"><input type="radio" name="preset" value="inequivoco">
+						<span><strong>Inequívoco <em class="rec">recomendado</em></strong><small>Solo marca como duplicadas las pestañas que son, sin lugar a dudas, la misma página: la misma dirección, aunque cambien detalles que no alteran nada (http/https, «www», la barra final, parámetros de rastreo) o aunque la web la escriba de dos formas (<code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>). Nunca usa el título. Lo que tiene un matiz (otro minuto del vídeo, otra #sección) aparece aparte como dudoso.</small></span></label>
+					<label class="choice"><input type="radio" name="preset" value="original">
+						<span><strong>Como Duplicate Tabs Closer</strong><small>Reproduce los ajustes que usabas en la extensión original: ignora mayúsculas, «www» y lo que va tras «#», y además une las pestañas que tienen el mismo título. Sirve para comparar. Ojo: unir por título mezcla páginas distintas que se llaman igual.</small></span></label>
+					<label class="choice"><input type="radio" name="preset" value="personalizado">
+						<span><strong>Personalizado <em class="rec neutral">búsqueda avanzada</em></strong><small>Tú decides cada criterio, para casos peculiares: agrupar por dominio, ignorar ciertos parámetros, comparar títulos, reglas propias por web… Al tocar cualquier opción avanzada pasas a este modo.</small></span></label>
+				</div>
+				<div id="presetSummary" class="summary-box"></div>
+
+				<details id="advanced" class="advanced">
+					<summary>Opciones avanzadas</summary>
+					<div class="adv-body">
+						<h3>Dirección (URL)</h3>
+						<label class="opt"><input type="checkbox" name="m.siteRules"><span class="tick"></span><span><b>Reglas inteligentes por web</b><small>Entiende cómo escriben sus direcciones YouTube, Instagram, X/Twitter, Reddit, Wikipedia, Google, Amazon, Facebook, TikTok, GitHub, Spotify y Google Docs/Drive. Por ejemplo: <code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>, y cada perfil de Instagram es una página distinta.</small></span></label>
+						<label class="opt"><input type="checkbox" name="m.dropTracking"><span class="tick"></span><span><b>Quitar parámetros de rastreo</b><small><code>utm_source</code>, <code>fbclid</code>, <code>gclid</code>, <code>igsh</code>, <code>si</code>… Dicen de dónde vienes; no cambian la página.</small></span></label>
+						<label class="opt"><input type="checkbox" name="m.ignoreScheme"><span class="tick"></span><span><b>http y https son la misma página</b><small>Es la misma web, con y sin cifrado.</small></span></label>
+						<label class="opt"><input type="checkbox" name="m.ignoreWww"><span class="tick"></span><span><b>Con y sin «www.» es la misma página</b><small><code>www.ejemplo.com</code> = <code>ejemplo.com</code>.</small></span></label>
+						<label class="opt"><input type="checkbox" name="m.ignoreMobile"><span class="tick"></span><span><b>La versión móvil es la misma página</b><small><code>m.ejemplo.com</code> = <code>ejemplo.com</code>.</small></span></label>
+						<label class="opt"><input type="checkbox" name="m.ignoreCase"><span class="tick"></span><span><b>No distinguir mayúsculas</b><small>En muchas webs <code>/Pagina</code> y <code>/pagina</code> son lo mismo, pero no en todas: los códigos de vídeos o publicaciones sí distinguen mayúsculas.</small></span></label>
+						<div class="opt-field">
+							<span class="label">Lo que va tras «#»</span>
+							<div class="seg">
+								<label><input type="radio" name="m.hashMode" value="doubt"><span>Dudoso</span></label>
+								<label><input type="radio" name="m.hashMode" value="ignore"><span>Se ignora</span></label>
+								<label><input type="radio" name="m.hashMode" value="distinct"><span>Página distinta</span></label>
+							</div>
+							<small class="hint">Suele ser un salto a una sección (<code>#historia</code>): mismo documento. Pero en algunas webs es otra vista (<code>#inbox/123</code> en Gmail, <code>#/ajustes</code>), y eso siempre se respeta salvo que elijas «Se ignora».</small>
+						</div>
+						<div class="opt-field">
+							<span class="label">Lo que va tras «?» (parámetros)</span>
+							<div class="seg">
+								<label><input type="radio" name="m.queryMode" value="keep"><span>Cuenta</span></label>
+								<label><input type="radio" name="m.queryMode" value="ignore"><span>Se ignora</span></label>
+							</div>
+							<small class="hint warn">⚠ Si se ignora, <code>youtube.com/playlist?list=A</code> y <code>?list=B</code> serían «la misma página», igual que todos los vídeos <code>watch?v=…</code>. Mejor usa «Parámetros que no cuentan».</small>
+						</div>
+						<label class="opt"><input type="checkbox" name="m.ignorePath"><span class="tick"></span><span><b>Ignorar la ruta (solo cuenta el dominio)</b><small class="warn">⚠ Todas las páginas de una web serían «la misma»: todo instagram.com, todo youtube.com… Es lo que provocaba falsos duplicados en la original. Para un sitio concreto, usa una regla propia con <code>ruta:0</code>.</small></span></label>
+						<div class="opt-field">
+							<label class="label" for="m_ignoreParams">Parámetros que no cuentan</label>
+							<input id="m_ignoreParams" class="input" name="m.ignoreParams" placeholder="por ejemplo: sort, view, page" spellcheck="false">
+							<small class="hint">Separados por comas. Se ignoran en todas las webs.</small>
+						</div>
+						<div class="opt-field">
+							<label class="label" for="m_urlRules">Reglas propias por web</label>
+							<textarea id="m_urlRules" name="m.urlRules" rows="4" spellcheck="false" placeholder="tienda.com ruta:2&#10;foro.com parametros:t&#10;/noticias\.com\/articulo\/(\d+)/"></textarea>
+							<div class="hint rules-help">
+								<div><code>dominio.com ruta:2</code> solo cuentan los 2 primeros tramos de la ruta (<code>ruta:0</code> = todo el sitio)</div>
+								<div><code>dominio.com sin-parametros</code> ignora lo que va tras «?»</div>
+								<div><code>dominio.com parametros:id,page</code> solo cuentan esos parámetros</div>
+								<div><code>dominio.com ignorar:sort,view</code> esos parámetros no cuentan</div>
+								<div><code>dominio.com sin-ancla</code> ignora lo que va tras «#»</div>
+								<div><code>dominio.com mayusculas</code> no distingue mayúsculas en esa web</div>
+								<div><code>/expresión(captura)/</code> agrupa las direcciones que encajan; si hay paréntesis, por lo capturado</div>
+							</div>
+						</div>
+
+						<h3>Título de la página</h3>
+						<div class="opt-field">
+							<span class="label">Usar el título</span>
+							<div class="seg">
+								<label><input type="radio" name="m.titleMode" value="off"><span>No</span></label>
+								<label><input type="radio" name="m.titleMode" value="or"><span>URL o título idéntico</span></label>
+								<label><input type="radio" name="m.titleMode" value="and"><span>URL y además título</span></label>
+								<label><input type="radio" name="m.titleMode" value="similar"><span>URL o título parecido</span></label>
+							</div>
+							<small class="hint">«No» es lo más fiable. «URL o título» une páginas distintas con el mismo nombre (dos búsquedas que se titulan igual). «URL y además título» es más estricto: exige ambas cosas. «Parecido» es el que más se equivoca: todos los perfiles de Instagram tienen títulos casi iguales.</small>
+						</div>
+						<div class="opt-field">
+							<label class="label" for="m_titleThreshold">Parecido mínimo de títulos <output id="m_titleThresholdOut"></output></label>
+							<input type="range" id="m_titleThreshold" name="m.titleThreshold" min="50" max="100" step="1">
+						</div>
+						<div class="opt-field">
+							<label class="label" for="m_titleRules">Reglas de títulos</label>
+							<textarea id="m_titleRules" name="m.titleRules" rows="2" spellcheck="false" placeholder="* - Mi intranet&#10;/^Factura \d+/"></textarea>
+							<small class="hint">Las pestañas cuyo título encaja en la misma regla se agrupan. Una por línea: texto con <code>*</code> como comodín, o <code>/expresión/</code>.</small>
+						</div>
+
+						<h3>Dudosos</h3>
+						<label class="opt"><input type="checkbox" name="m.showDoubtful"><span class="tick"></span><span><b>Mostrar casos dudosos</b><small>Páginas casi iguales con un matiz: el mismo vídeo en otro minuto o dentro de una lista, otra #sección, el modo lectura, una variante móvil o con <code>?ref=</code>… Nunca se cierran solos.</small></span></label>
+						<button type="button" class="btn ghost small" id="copyPreset">Partir de «Inequívoco»</button>
+					</div>
+				</details>
+			</section>
+
 			<section class="card">
-				<h2>Qué se considera duplicado</h2>
+				<h2>Qué pestañas se comparan</h2>
 				<div class="field">
 					<span class="label">Buscar duplicados en</span>
 					<div class="seg">
@@ -78,11 +177,12 @@
 					</div>
 				</div>
 				<label class="switch"><input type="checkbox" name="separateContainers"><span></span>Los contenedores son mundos aparte <small>(la misma página en «Trabajo» y en «Personal» no es duplicada)</small></label>
-				<label class="switch"><input type="checkbox" name="anchorsDistinct"><span></span>Distinguir secciones de una página <small>(<code>pagina#historia</code> y <code>pagina#precios</code> serán dudosos en vez de duplicados)</small></label>
+				<label class="switch"><input type="checkbox" name="includeHidden"><span></span>Incluir pestañas ocultas <small>(las de otros grupos en gestores como Simple Tab Groups)</small></label>
+				<p class="hint">Las pestañas vacías, de nueva pestaña y las ventanas privadas frente a las normales nunca se comparan.</p>
 				<div class="field">
 					<label class="label" for="exclusions">Nunca comprobar estas webs</label>
-					<textarea id="exclusions" name="exclusions" rows="4" spellcheck="false" placeholder="Una por línea, por ejemplo:&#10;mail.google.com&#10;ejemplo.com/panel/*"></textarea>
-					<small class="hint">Un dominio incluye sus subdominios. Usa <code>*</code> como comodín.</small>
+					<textarea id="exclusions" name="exclusions" rows="4" spellcheck="false" placeholder="Una por línea, por ejemplo:&#10;mail.google.com&#10;ejemplo.com/panel/*&#10;/^https:\/\/(?!.*google\.com)/"></textarea>
+					<small class="hint">Un dominio incluye sus subdominios. Usa <code>*</code> como comodín o <code>/expresión/</code> para una expresión regular.</small>
 				</div>
 			</section>
 
@@ -101,31 +201,46 @@
 					<label><input type="radio" name="keepPolicy" value="newest"><span>La más nueva</span></label>
 					<label><input type="radio" name="keepPolicy" value="recent"><span>La última que usé</span></label>
 				</div>
-				<p class="hint">Las pestañas fijadas siempre se conservan. La elegida aparece marcada con ★ en la lista.</p>
+				<label class="switch"><input type="checkbox" name="keepActive"><span></span>Antes que nada, la que estoy viendo</label>
+				<label class="switch"><input type="checkbox" name="preferActiveWindow"><span></span>Preferir la de la ventana que estoy usando</label>
+				<label class="switch"><input type="checkbox" name="keepHttps"><span></span>Preferir la segura (https) frente a http</label>
+				<p class="hint">Orden: fijada → la que estás viendo → ventana en uso → https → antigüedad. Las fijadas nunca se cierran. La elegida aparece marcada con ★.</p>
 			</section>
 
 			<section class="card">
 				<h2>Al pulsar el icono</h2>
 				<div class="seg">
 					<label><input type="radio" name="clickAction" value="popup"><span>Ventanita</span></label>
+					<label><input type="radio" name="clickAction" value="window"><span>Ventana grande</span></label>
 					<label><input type="radio" name="clickAction" value="tab"><span>Esta página en una pestaña</span></label>
 					<label><input type="radio" name="clickAction" value="sidebar"><span>Panel lateral</span></label>
 				</div>
-				<p class="hint">La ventanita muestra lo básico. Para cambiar su tamaño, arrastra la barra de abajo (alto) o la esquina inferior derecha (alto y ancho); con doble clic vuelve al tamaño normal. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
+				<p class="hint"><b>Ventanita</b>: lo básico, junto al icono. Firefox no deja que pase de 800 × 600 px. <b>Ventana grande</b>: una ventana aparte con todo, de tamaño libre, que recuerda dónde la dejaste; también la usan los avisos. Para cambiar el tamaño de la ventanita, arrastra la barra de abajo (alto) o la esquina inferior derecha (alto y ancho); con doble clic vuelve al tamaño normal. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
 				<div class="grid2">
 					<div class="field">
 						<label class="label" for="popupWidth">Ancho de la ventanita <output id="popupWidthOut"></output></label>
-						<input type="range" id="popupWidth" name="popupWidth" min="300" max="780" step="10">
+						<input type="range" id="popupWidth" name="popupWidth" min="300" max="800" step="10">
 					</div>
 					<div class="field">
-						<label class="label" for="popupHeight">Alto de la lista <output id="popupHeightOut"></output></label>
-						<input type="range" id="popupHeight" name="popupHeight" min="120" max="540" step="10">
+						<label class="label" for="popupHeight">Alto de la ventanita <output id="popupHeightOut"></output></label>
+						<input type="range" id="popupHeight" name="popupHeight" min="220" max="600" step="10">
 					</div>
 					<div class="field">
 						<label class="label" for="popupFontSize">Texto de la ventanita <output id="popupFontSizeOut"></output></label>
 						<input type="range" id="popupFontSize" name="popupFontSize" min="11" max="18" step="1">
 					</div>
 				</div>
+			</section>
+
+			<section class="card">
+				<h2>Número del icono</h2>
+				<div class="badge-colors">
+					<label><input type="color" name="badgeColor"> Duplicados</label>
+					<label><input type="color" name="badgeDoubtColor"> Solo dudosos</label>
+					<label><input type="color" name="badgeZeroColor"> Sin duplicados</label>
+				</div>
+				<label class="switch"><input type="checkbox" name="badgeDoubtful"><span></span>Mostrar «?» cuando solo hay dudosos</label>
+				<label class="switch"><input type="checkbox" name="showZeroBadge"><span></span>Mostrar «0» cuando no hay duplicados</label>
 			</section>
 
 			<section class="card">
@@ -185,6 +300,15 @@
 			<p>Dos pestañas son duplicadas cuando <strong>muestran la misma página</strong>. Para saberlo se mira <strong>solo la dirección (URL)</strong>, nunca el título: los títulos de una misma web se parecen demasiado (todos los perfiles de Instagram, todos los vídeos de YouTube…) y eso provoca falsos duplicados.</p>
 		</section>
 		<section class="card">
+			<h2>Dos niveles: lo evidente y lo avanzado</h2>
+			<ul>
+				<li><strong>Inequívoco</strong> (por defecto): lo que verías a simple vista como «la misma página». No hay nada que configurar.</li>
+				<li><strong>Como Duplicate Tabs Closer</strong>: tus ajustes de la extensión original, para comparar resultados.</li>
+				<li><strong>Personalizado</strong>: todas las opciones de la original (mayúsculas, www, #, parámetros, ruta, título, parecido de títulos, reglas…) y algunas más, cada una explicada. Para búsquedas avanzadas y casos peculiares.</li>
+			</ul>
+			<p class="hint">En la lista, <em>¿Por qué se agrupan?</em> dice cuántos grupos hay por cada motivo, y <em>Comparar los tres modos</em> calcula cuántas pestañas sobrarían con cada uno, sobre tus pestañas de ahora.</p>
+		</section>
+		<section class="card">
 			<h2>Tres resultados posibles</h2>
 			<ul class="legend">
 				<li><span class="pill safe">Duplicado</span> Es la misma página aunque la dirección se escriba algo distinta. Se puede cerrar sin miedo.</li>
@@ -198,7 +322,7 @@
 				<li><code>http</code> o <code>https</code>, <code>www.</code> o sin él, la versión móvil (<code>m.</code>).</li>
 				<li>La barra <code>/</code> final y el orden de los parámetros.</li>
 				<li>Parámetros de rastreo: <code>utm_…</code>, <code>fbclid</code>, <code>gclid</code>, <code>si</code>, <code>igsh</code>… No cambian la página, solo dicen de dónde vienes.</li>
-				<li>El salto a una sección (<code>#historia</code>), salvo que lo configures distinto. Ojo: en webs como Gmail lo que va tras <code>#</code> sí indica otra página, y se respeta.</li>
+				<li>El salto a una sección (<code>#historia</code>) no se ignora del todo: es la misma página en otra posición, así que aparece como <strong>dudoso</strong>. En webs como Gmail lo que va tras <code>#</code> indica otra página, y se respeta.</li>
 			</ul>
 		</section>
 		<section class="card">
@@ -216,6 +340,7 @@
 			<h2>Lo que nunca se considera duplicado</h2>
 			<ul>
 				<li>Pestañas vacías o de «Nueva pestaña».</li>
+				<li>Páginas internas de Firefox y de otras extensiones (grupos de <strong>Sidebery</strong> o Tree Style Tab, pestañas suspendidas…) salvo que su dirección sea exactamente la misma, letra por letra. Nunca se las une por título.</li>
 				<li>La misma página en <strong>ventanas privadas</strong> y normales, ni (por defecto) en <strong>contenedores</strong> distintos: son sesiones diferentes.</li>
 				<li>Pestañas abiertas a propósito desde la misma página (por ejemplo con «Duplicar pestaña»): aparecen en la lista, pero no generan avisos.</li>
 				<li>Las webs que añadas a la lista de exclusión.</li>

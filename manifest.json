@@ -60,6 +60,9 @@
       },
       "description": "Abrir la ventanita de duplicados"
     },
+    "open-window": {
+      "description": "Abrir la ventana grande de duplicados"
+    },
     "open-page": {
       "description": "Abrir la página completa de duplicados"
     },

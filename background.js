@@ -23,13 +23,15 @@ let createdBurst = [];
 
 // ------------------------------------------------------------------ análisis
 
+let profile = DupNormalize.compile(DupSettings.profileOf(settings));
+
 const cache = new Map();
-const analyzeCached = (url) => {
-	const k = (settings.anchorsDistinct ? "1" : "0") + url;
+const analyzeCached = (url, prof = profile) => {
+	const k = prof.sig + "\n" + url;
 	let a = cache.get(k);
 	if (!a) {
-		if (cache.size > 6000) cache.clear();
-		a = analyze(url, { anchorsDistinct: settings.anchorsDistinct });
+		if (cache.size > 8000) cache.clear();
+		a = analyze(url, prof);
 		cache.set(k, a);
 	}
 	return a;
@@ -42,35 +44,51 @@ const scopeOf = (tab) => {
 	return s;
 };
 
-const isTrackable = (tab) => tab.url && !tab.url.startsWith(OWN_URL) && !exclusions.some(fn => fn(tab.url));
+const isTrackable = (tab) => tab.url && !tab.url.startsWith(OWN_URL) && !(tab.hidden && !settings.includeHidden) && !exclusions.some(fn => fn(tab.url));
 
 const tabInfo = (t) => ({
 	id: t.id, windowId: t.windowId, index: t.index, title: t.title || t.url, url: t.url,
 	favIconUrl: t.favIconUrl || "", pinned: t.pinned, active: t.active, discarded: !!t.discarded,
 	cookieStoreId: t.cookieStoreId, incognito: t.incognito, lastAccessed: t.lastAccessed || 0,
-	status: t.status, intentional: intentional.has(t.id), audible: !!t.audible
+	status: t.status, intentional: intentional.has(t.id), audible: !!t.audible, hidden: !!t.hidden
 });
 
-// Cuál conservar: siempre la fijada; después, según el ajuste.
+// Cuál conservar: siempre la fijada; luego, según tus prioridades.
+let focusedWindowId = null;
 const chooseKeep = (tabs) => {
 	const score = (t) => {
 		if (settings.keepPolicy === "newest") return t.id;
 		if (settings.keepPolicy === "recent") return t.lastAccessed;
 		return -t.id; // las pestañas más antiguas tienen identificador menor
 	};
-	return tabs.slice().sort((a, b) => (b.pinned - a.pinned) || (score(b) - score(a)))[0].id;
+	const https = (t) => (settings.keepHttps && t.url.startsWith("https:") ? 1 : 0);
+	const active = (t) => (settings.keepActive && t.active ? 1 : 0);
+	const win = (t) => (settings.preferActiveWindow && t.windowId === focusedWindowId ? 1 : 0);
+	return tabs.slice().sort((a, b) => (b.pinned - a.pinned) || (active(b) - active(a)) || (win(b) - win(a)) || (https(b) - https(a)) || (score(b) - score(a)))[0].id;
 };
 
-const mergeDetails = (urls) => {
-	const out = new Set();
-	let title = null;
+// Explica un grupo comparando la primera dirección con las demás.
+const explainGroup = (tabs, joinedBy, profile) => {
+	const details = new Set(), codes = new Set();
+	const urls = [...new Set(tabs.map(t => t.url))];
+	if (urls.length === 1) return { title: "Direcciones idénticas", details: ["Las pestañas tienen exactamente la misma dirección."], codes: ["identical"] };
+	let urlJoined = true;
 	for (let i = 1; i < urls.length; i++) {
-		if (urls[i] === urls[0]) continue;
-		const e = explain(urls[0], urls[i], { anchorsDistinct: settings.anchorsDistinct });
-		e.details.forEach(d => out.add(d));
-		title = title || e.title;
+		const e = explain(urls[0], urls[i], profile);
+		if (e.level === "seguro" || e.level === "exacto" || joinedBy === "loose") {
+			e.details.forEach(d => details.add(d));
+			e.codes.forEach(c => codes.add(c));
+		} else urlJoined = false;
 	}
-	return { title, details: [...out] };
+	let title = joinedBy === "loose" ? "Dudoso: casi la misma página" : "Misma página";
+	if (!urlJoined) {
+		const regexJoined = joinedBy === "titleRegex";
+		const similar = profile.titleMode === "similar" && profile.titleThreshold < 100;
+		codes.add(regexJoined ? "custom" : similar ? "titleSimilar" : "title");
+		details.add(regexJoined ? "Sus títulos encajan en una de tus reglas de títulos." : similar ? `Sus títulos se parecen al menos un ${profile.titleThreshold} % (ajuste «comparar títulos»).` : `Tienen el mismo título: «${tabs[0].title}» (ajuste «comparar títulos»).`);
+		title = regexJoined ? "Regla de títulos" : similar ? "Título parecido" : "Mismo título";
+	}
+	return { title, details: [...details], codes: [...codes] };
 };
 
 let containers = {};
@@ -81,54 +99,105 @@ const loadContainers = async () => {
 	} catch { containers = {}; }
 };
 
-const compute = async () => {
-	const all = await browser.tabs.query({});
-	const strictMap = new Map(), looseMap = new Map();
-	let tracked = 0;
+// Agrupa las pestañas según un perfil de detección.
+const buildGroups = (all, profile) => {
+	const items = [];
 	for (const t of all) {
 		if (!isTrackable(t) || ignoredTabs.has(t.id)) continue;
-		const a = analyzeCached(t.url);
+		const a = analyzeCached(t.url, profile);
 		if (!a.ok) continue;
-		tracked++;
-		const scope = scopeOf(t);
-		const sk = scope + "§" + a.strict, lk = scope + "§" + a.loose;
 		const info = tabInfo(t);
 		info.strict = a.strict;
-		if (!strictMap.has(sk)) strictMap.set(sk, { a, tabs: [] });
-		strictMap.get(sk).tabs.push(info);
-		if (!looseMap.has(lk)) looseMap.set(lk, { a, tabs: [], stricts: new Set() });
-		const l = looseMap.get(lk);
-		l.tabs.push(info);
-		l.stricts.add(a.strict);
+		items.push({ info, a, scope: scopeOf(t), title: DupNormalize.normTitle(t.title) });
 	}
 
+	// Unión de pestañas: misma huella (y, si lo pides, mismo título o título parecido).
+	const parent = items.map((_, i) => i);
+	const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+	const join = new Map(); // raíz → cómo se unió
+	const union = (i, j, how) => { const a = find(i), b = find(j); if (a !== b) { parent[b] = a; if (how !== "url") join.set(a, how); } };
+	const byKey = (keyOf, how) => {
+		const seen = new Map();
+		items.forEach((it, i) => {
+			const k = keyOf(it);
+			if (k === null) return;
+			if (seen.has(k)) union(seen.get(k), i, how); else seen.set(k, i);
+		});
+	};
+	// El título nunca se usa en páginas internas ni de otras extensiones (grupos de Sidebery, Tree Style Tab...):
+	// dos grupos pueden llamarse igual y ser distintos.
+	const usableTitle = (it) => it.title && it.title !== it.info.url.toLowerCase() && it.info.status !== "loading" && /^(https?|file):/i.test(it.info.url);
+	const tm = profile.titleMode;
+	byKey(it => it.scope + "§" + it.a.strict + (tm === "and" ? "§" + (usableTitle(it) ? it.title : it.info.id) : ""), "url");
+	if (tm === "or" || (tm === "similar" && profile.titleThreshold >= 100)) byKey(it => (usableTitle(it) ? it.scope + "§" + it.title : null), "title");
+	else if (tm === "similar") {
+		const buckets = new Map();
+		items.forEach((it, i) => { if (usableTitle(it)) { if (!buckets.has(it.scope)) buckets.set(it.scope, []); buckets.get(it.scope).push(i); } });
+		const th = profile.titleThreshold;
+		for (const list of buckets.values()) {
+			for (let x = 0; x < list.length; x++) for (let y = x + 1; y < list.length; y++) {
+				const A = items[list[x]].title, B = items[list[y]].title;
+				const maxLen = Math.max(A.length, B.length);
+				if (Math.abs(A.length - B.length) > maxLen * (100 - th) / 100) continue;
+				if (DupNormalize.titleSimilarity(A, B) >= th) union(list[x], list[y], "title");
+			}
+		}
+	}
+	profile.titleRegex.forEach((re, r) => byKey(it => (usableTitle(it) && re.test(it.info.title) ? it.scope + "§tre" + r : null), "titleRegex"));
+
+	const roots = new Map();
+	items.forEach((it, i) => { const r = find(i); if (!roots.has(r)) roots.set(r, []); roots.get(r).push(it); });
+
 	const groups = [];
-	let extra = 0;
-	for (const [id, g] of strictMap) {
-		if (g.tabs.length < 2) continue;
-		const urls = g.tabs.map(t => t.url);
-		const identical = urls.every(u => u === urls[0]);
-		const exp = identical ? { title: "Direcciones idénticas", details: ["Las pestañas tienen exactamente la misma dirección."] } : mergeDetails(urls);
+	const reasons = {};
+	let extra = 0, doubtful = 0;
+	for (const [r, list] of roots) {
+		if (list.length < 2) continue;
+		const tabs = list.map(x => x.info);
+		const id = "s§" + list[0].scope + "§" + list[0].a.strict;
+		const exp = explainGroup(tabs, join.get(r) || "url", profile);
 		const ignored = ignoredGroups.has(id);
-		if (!ignored) extra += g.tabs.length - 1;
+		if (!ignored) { extra += tabs.length - 1; exp.codes.forEach(c => { reasons[c] = (reasons[c] || 0) + 1; }); }
 		groups.push({
-			id, level: "seguro", identical, ignored, site: g.a.site, what: g.a.what, key: g.a.strict,
-			keepId: chooseKeep(g.tabs), tabs: g.tabs, title: exp.title || "Misma página", details: exp.details
+			id, level: "seguro", identical: exp.codes.length === 1 && exp.codes[0] === "identical", ignored,
+			site: list[0].a.site, what: list[0].a.what, key: list[0].a.strict, codes: exp.codes,
+			keepId: chooseKeep(tabs), tabs, title: exp.title, details: exp.details
 		});
 	}
-	let doubtful = 0;
-	for (const [id, g] of looseMap) {
-		if (g.stricts.size < 2) continue;
-		const exp = mergeDetails(g.tabs.map(t => t.url));
-		const ignored = ignoredGroups.has(id);
-		if (!ignored) doubtful++;
-		groups.push({
-			id, level: "dudoso", ignored, site: g.a.site, what: g.a.what, key: g.a.loose,
-			keepId: chooseKeep(g.tabs), tabs: g.tabs, title: "Dudoso: casi la misma página", details: exp.details
-		});
+	if (profile.showDoubtful) {
+		const looseMap = new Map();
+		for (const it of items) {
+			const lk = it.scope + "§" + it.a.loose;
+			if (!looseMap.has(lk)) looseMap.set(lk, { a: it.a, tabs: [], stricts: new Set() });
+			const l = looseMap.get(lk);
+			l.tabs.push(it.info);
+			l.stricts.add(it.a.strict);
+		}
+		for (const [lk, g] of looseMap) {
+			if (g.stricts.size < 2) continue;
+			const id = "d§" + lk;
+			const exp = explainGroup(g.tabs, "loose", profile);
+			const ignored = ignoredGroups.has(id);
+			if (!ignored) doubtful++;
+			groups.push({
+				id, level: "dudoso", ignored, site: g.a.site, what: g.a.what, key: g.a.loose, codes: exp.codes,
+				keepId: chooseKeep(g.tabs), tabs: g.tabs, title: exp.title, details: exp.details
+			});
+		}
 	}
+	return { groups, reasons, extra, doubtful, tracked: items.length };
+};
+
+const compute = async () => {
+	const [all, fw] = await Promise.all([browser.tabs.query({}), browser.windows.getLastFocused().catch(() => null)]);
+	focusedWindowId = fw ? fw.id : null;
+	const { groups, reasons, extra, doubtful, tracked } = buildGroups(all, profile);
 	const safe = groups.filter(g => g.level === "seguro" && !g.ignored).length;
-	state = { groups, stats: { safe, doubtful, extra, tabs: tracked, total: all.length }, undo: undoStack.length, containers, ignoredTabs: ignoredTabs.size };
+	state = {
+		groups, reasons, preset: settings.preset,
+		stats: { safe, doubtful, extra, tabs: tracked, total: all.length },
+		undo: undoStack.length, containers, ignoredTabs: ignoredTabs.size
+	};
 	updateBadge();
 	broadcast({ type: "state", state });
 	handlePendingChecks(all);
@@ -144,9 +213,10 @@ const scheduleCompute = (delay = 120) => {
 
 const updateBadge = () => {
 	const { extra, doubtful } = state.stats;
-	let text = "", color = "#d92d20";
+	let text = "", color = settings.badgeColor;
 	if (extra > 0) text = String(extra);
-	else if (doubtful > 0) { text = "?"; color = "#dc8a00"; }
+	else if (doubtful > 0 && settings.badgeDoubtful) { text = "?"; color = settings.badgeDoubtColor; }
+	else if (settings.showZeroBadge) { text = "0"; color = settings.badgeZeroColor; }
 	browser.browserAction.setBadgeText({ text });
 	browser.browserAction.setBadgeBackgroundColor({ color });
 	if (browser.browserAction.setBadgeTextColor) browser.browserAction.setBadgeTextColor({ color: "#ffffff" });
@@ -221,6 +291,8 @@ const openPanel = async (focus) => {
 		if (shown.kind === "window" && panelWindowId !== null) browser.windows.update(panelWindowId, { focused: true }).catch(() => {});
 		return;
 	}
+	// Si prefieres la ventana grande, el aviso también la usa.
+	if (settings.clickAction === "window") { await openWindow(); return; }
 	try {
 		if (settings.clickAction !== "popup") await browser.browserAction.setPopup({ popup: POPUP_URL });
 		await browser.browserAction.openPopup();
@@ -238,11 +310,13 @@ const openWindow = async () => {
 		try {
 			const w = await browser.windows.get(panelWindowId);
 			await browser.windows.update(panelWindowId, w.state === "minimized" ? { focused: true, state: "normal" } : { focused: true });
+			const port = [...ports].find(p => p.kind === "window");
+			if (port && pendingFocus) { port.postMessage({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
 			return;
 		} catch { panelWindowId = null; }
 	}
 	const { panelBounds } = await browser.storage.local.get("panelBounds");
-	const b = panelBounds || { width: 420, height: 640 };
+	const b = panelBounds || { width: 560, height: 840 };
 	const opts = { type: "popup", url: PAGE_URL + "?mode=window", width: b.width, height: b.height };
 	if (Number.isFinite(b.left) && Number.isFinite(b.top)) { opts.left = b.left; opts.top = b.top; }
 	const w = await browser.windows.create(opts);
@@ -283,6 +357,20 @@ const handlePanelMessage = async (port, msg) => {
 		case "openPage":
 			openPage(msg.view);
 			break;
+		case "openWindow":
+			openWindow();
+			break;
+		case "compare": {
+			// Cuántas pestañas sobrarían con cada modo, sobre tus pestañas de ahora.
+			const all = await browser.tabs.query({});
+			const out = {};
+			for (const preset of ["inequivoco", "original", "personalizado"]) {
+				const r = buildGroups(all, DupNormalize.compile(DupSettings.profileOf({ ...settings, preset })));
+				out[preset] = { extra: r.extra, doubtful: r.doubtful, groups: r.groups.filter(g => g.level === "seguro").length };
+			}
+			port.postMessage({ type: "compare", result: out });
+			break;
+		}
 		case "bounds":
 			browser.storage.local.set({ panelBounds: msg.bounds });
 			break;
@@ -437,11 +525,13 @@ browser.tabs.onActivated.addListener(() => scheduleCompute(300));
 // Solo se usa si el icono no abre la ventanita (ajuste «Al pulsar el icono»).
 browser.browserAction.onClicked.addListener(() => {
 	if (settings.clickAction === "sidebar") browser.sidebarAction.toggle();
+	else if (settings.clickAction === "window") openWindow();
 	else openPage();
 });
 
 browser.commands.onCommand.addListener((cmd) => {
 	if (cmd === "open-page") openPage();
+	else if (cmd === "open-window") openWindow();
 	else if (cmd === "close-safe") closeAllSafe();
 });
 
@@ -450,12 +540,14 @@ const setupMenus = () => {
 	browser.menus.create({ id: "show", title: "Ver duplicados de esta pestaña", contexts: ["tab"] });
 	browser.menus.create({ id: "ignore", title: "No es duplicada: ignorar esta pestaña", contexts: ["tab"] });
 	browser.menus.create({ id: "close-safe", title: "Cerrar todos los duplicados seguros", contexts: ["browser_action"] });
+	browser.menus.create({ id: "window", title: "Abrir en ventana grande", contexts: ["browser_action"] });
 	browser.menus.create({ id: "page", title: "Abrir en una pestaña", contexts: ["browser_action"] });
 	browser.menus.create({ id: "sidebar", title: "Abrir en el panel lateral", contexts: ["browser_action"] });
 };
 browser.menus.onClicked.addListener((info, tab) => {
 	if (info.menuItemId === "sidebar") { browser.sidebarAction.open(); return; }
 	if (info.menuItemId === "page") openPage();
+	else if (info.menuItemId === "window") openWindow();
 	else if (info.menuItemId === "close-safe") closeAllSafe();
 	else if (info.menuItemId === "ignore" && tab) { ignoredTabs.add(tab.id); scheduleCompute(0); }
 	else if (info.menuItemId === "show" && tab) {
@@ -469,6 +561,7 @@ browser.menus.onClicked.addListener((info, tab) => {
 const applySettings = (s) => {
 	settings = s;
 	exclusions = DupSettings.compileExclusions(s.exclusions);
+	profile = DupNormalize.compile(DupSettings.profileOf(s));
 	applyClickAction();
 	cache.clear();
 };

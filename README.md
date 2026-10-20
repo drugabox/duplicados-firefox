@@ -39,10 +39,35 @@ Tus ejemplos:
 
 En **Ajustes → Comprobar dos direcciones** puedes pegar dos URL y ver qué se compara y por qué.
 
+## Modos de detección
+
+| Modo | Para qué |
+|---|---|
+| **Inequívoco** (por defecto) | Lo evidente: solo lo que es, sin lugar a dudas, la misma página. Nada que configurar. Los matices (otro minuto del vídeo, otra `#sección`) aparecen aparte, como dudosos. |
+| **Como Duplicate Tabs Closer** | Tus ajustes de la original (ignora mayúsculas, `www` y `#`, y une por título idéntico). Sirve para comparar. |
+| **Personalizado** | Búsqueda avanzada: todas las opciones de la original (mayúsculas, www, `#`, parámetros, ruta, título idéntico o parecido, reglas de URL y de títulos) y más (http/https, versión móvil, rastreo, reglas por web, parámetros que no cuentan, reglas propias por dominio, mostrar dudosos), cada una explicada. |
+
+En la lista, **¿Por qué se agrupan?** cuenta los grupos por motivo (pulsa uno para ver solo esos). **Comparar los tres modos** calcula cuántas pestañas sobrarían con cada modo, sobre tus pestañas reales. **Copiar informe** copia todos los grupos con sus direcciones y su motivo.
+
+Las páginas internas de Firefox y las de otras extensiones (grupos de Sidebery o Tree Style Tab, pestañas suspendidas…) solo se consideran duplicadas si su dirección es exactamente la misma, letra por letra. Nunca se agrupan por título. Así lo hace también la original.
+
+**Reglas propias** (Personalizado → Reglas propias por web), una por línea:
+
+```
+tienda.com ruta:2            solo cuentan los 2 primeros tramos de la ruta (ruta:0 = todo el sitio)
+foro.com sin-parametros      ignora lo que va tras «?»
+foro.com parametros:t,page   solo cuentan esos parámetros
+tienda.com ignorar:sort,view esos parámetros no cuentan
+docs.ejemplo.com sin-ancla   ignora lo que va tras «#»
+wiki.ejemplo.com mayusculas  no distingue mayúsculas en esa web
+/noticias\.com\/articulo\/(\d+)/  agrupa por lo capturado entre paréntesis
+```
+
 ## Funciones
 
 - **Aviso al abrir un duplicado:** se abre la ventanita del icono y salta a esa pareja: la resalta y marca la pestaña «nueva». Necesita Firefox 149 o posterior; en versiones anteriores se abre una ventana aparte. En su lugar puedes elegir una notificación del sistema, no avisar, o cerrar la nueva automáticamente (y deshacer).
-- **Ventanita del icono, limpia y directa** (como la original): botón para cerrar duplicados, la lista con lo que cambia entre cada pareja y un selector de qué hacer al abrir un duplicado. Se estira arrastrando la barra de abajo (alto) o la esquina (alto y ancho), y recuerda el tamaño. Doble clic en la barra la devuelve al tamaño normal.
+- **Ventanita del icono, limpia y directa** (como la original): botón para cerrar duplicados, la lista con lo que cambia entre cada pareja, y selectores de modo de detección y de aviso. Se estira arrastrando la barra de abajo (alto) o la esquina (alto y ancho), y recuerda el tamaño. Firefox no deja que pase de 800 × 600 px. Doble clic en la barra la devuelve al tamaño normal.
+- **Ventana grande** (botón ▭ de la ventanita, clic derecho en el icono, o como acción del icono): una ventana aparte con todo, de tamaño libre, que recuerda su tamaño y posición. Si la eliges como acción del icono, los avisos también la usan.
 - **Página completa en su propia pestaña** (botón ⤢ de la ventanita, o clic derecho en el icono): todos los datos, todos los ajustes y la ayuda. También funciona como **panel lateral** de Firefox.
 - **Lista clara:** resalta en cada URL la parte que cambia, explica el motivo, indica qué pestaña se conservará (★) y muestra la ventana, el contenedor, si está fijada, dormida o sonando.
 - **Cerrar duplicados** de golpe o por grupo, **conservar solo esta**, **Deshacer** (reabre con su historial).

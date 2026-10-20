@@ -153,6 +153,8 @@ const note = (text) => { const n = $("#note"); n.textContent = text; n.hidden = 
 
 $("#closeAll").addEventListener("click", () => send({ cmd: "closeAllSafe" }));
 $("#undo").addEventListener("click", () => send({ cmd: "undo" }));
+$("#openWindow").addEventListener("click", () => { send({ cmd: "openWindow" }); setTimeout(() => window.close(), 60); });
+$("#preset").addEventListener("change", (e) => DupSettings.save({ preset: e.target.value }));
 $("#openTab").addEventListener("click", () => { send({ cmd: "openPage" }); setTimeout(() => window.close(), 60); });
 $("#openSettings").addEventListener("click", () => { send({ cmd: "openPage", view: "ajustes" }); setTimeout(() => window.close(), 60); });
 $("#onDuplicate").addEventListener("change", (e) => DupSettings.save({ onDuplicate: e.target.value }));
@@ -179,9 +181,10 @@ grip.addEventListener("pointerdown", (e) => {
 	grip.classList.add("drag");
 	const corner = e.offsetX > grip.clientWidth - 18;
 	const start = { x: e.screenX, y: e.screenY, w: settings.popupWidth, h: settings.popupHeight };
+	const { POPUP_MIN: lo, POPUP_MAX: hi } = DupSettings;
 	const move = (ev) => {
-		settings.popupHeight = Math.max(120, Math.min(540, start.h + ev.screenY - start.y));
-		if (corner) settings.popupWidth = Math.max(300, Math.min(780, start.w + ev.screenX - start.x));
+		settings.popupHeight = Math.max(lo.height, Math.min(hi.height, start.h + ev.screenY - start.y));
+		if (corner) settings.popupWidth = Math.max(lo.width, Math.min(hi.width, start.w + ev.screenX - start.x));
 		applySize();
 	};
 	const up = () => {
@@ -192,7 +195,12 @@ grip.addEventListener("pointerdown", (e) => {
 	grip.addEventListener("pointermove", move);
 	grip.addEventListener("pointerup", up, { once: true });
 });
-grip.addEventListener("dblclick", () => { settings.popupHeight = 420; settings.popupWidth = 380; applySize(); DupSettings.save({ popupWidth: 380, popupHeight: 420 }); });
+grip.addEventListener("dblclick", () => {
+	const { popupWidth, popupHeight } = DupSettings.DEFAULTS;
+	Object.assign(settings, { popupWidth, popupHeight });
+	applySize();
+	DupSettings.save({ popupWidth, popupHeight });
+});
 
 // ------------------------------------------------------------------ arranque
 
@@ -201,5 +209,6 @@ grip.addEventListener("dblclick", () => { settings.popupHeight = 420; settings.p
 	applySize();
 	await DupTheme.apply(settings, { fontSize: settings.popupFontSize });
 	$("#onDuplicate").value = settings.onDuplicate;
+	$("#preset").value = settings.preset;
 	send({ cmd: "hello", kind: "popup" });
 })();

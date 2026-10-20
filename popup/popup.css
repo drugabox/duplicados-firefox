@@ -3,7 +3,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-	width: var(--w, 380px);
+	width: var(--w, 420px);
+	height: var(--h, 560px);
+	overflow: hidden;
 	background: var(--surface);
 	color: var(--text);
 	font: var(--fs, 13px)/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
@@ -42,7 +44,7 @@ button, select { font: inherit; color: inherit; }
 
 /* Lista */
 .list {
-	max-height: var(--h, 420px); overflow-y: auto; scrollbar-width: thin;
+	flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin;
 	border-top: 1px solid var(--border); outline: none;
 }
 .empty { padding: 26px 12px; text-align: center; color: var(--muted); }
@@ -80,9 +82,9 @@ button, select { font: inherit; color: inherit; }
 .more:hover { background: var(--surface-2); color: var(--text); }
 
 /* Pie */
-.foot { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: .9em; }
-.foot label { flex: 1; }
-.foot select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; }
+.foot { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: .9em; flex-wrap: wrap; flex: none; }
+.foot select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 0; }
+.head, .bar, .note { flex: none; }
 
 /* Asa para estirar la ventanita */
 .grip { height: 9px; cursor: ns-resize; position: relative; flex: none; }
