@@ -1,0 +1,68 @@
+{
+  "manifest_version": 2,
+  "name": "Duplicados",
+  "version": "1.0.0",
+  "description": "Detecta pestañas duplicadas con precisión, avisa al abrirlas y explica por qué lo son.",
+  "default_locale": "es",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "duplicados@privado.local",
+      "strict_min_version": "115.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "background": {
+    "scripts": [
+      "lib/normalize.js",
+      "lib/settings.js",
+      "background.js"
+    ]
+  },
+  "browser_action": {
+    "default_icon": "icons/icon.svg",
+    "default_title": "Duplicados",
+    "default_area": "navbar"
+  },
+  "sidebar_action": {
+    "default_title": "Duplicados",
+    "default_panel": "panel/panel.html?mode=sidebar",
+    "default_icon": "icons/icon.svg",
+    "open_at_install": false
+  },
+  "options_ui": {
+    "page": "panel/panel.html?mode=options#ajustes",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "tabs",
+    "storage",
+    "sessions",
+    "menus",
+    "notifications",
+    "contextualIdentities",
+    "cookies",
+    "theme"
+  ],
+  "commands": {
+    "open-panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
+      "description": "Abrir la lista de duplicados"
+    },
+    "close-safe": {
+      "description": "Cerrar todos los duplicados seguros"
+    },
+    "_execute_sidebar_action": {
+      "description": "Mostrar u ocultar el panel lateral"
+    }
+  }
+}

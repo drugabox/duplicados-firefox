@@ -1,0 +1,466 @@
+/* Proceso de fondo: vigila las pestañas, agrupa duplicados y avisa. */
+"use strict";
+
+const { analyze, explain } = DupNormalize;
+const OWN_URL = browser.runtime.getURL("");
+
+let settings = { ...DupSettings.DEFAULTS };
+let exclusions = [];
+
+const ports = new Set();            // paneles abiertos (ventana y/o lateral)
+let panelWindowId = null;           // ventana ajustable del panel
+let pendingFocus = null;            // pareja a mostrar cuando el panel se conecte
+let state = { groups: [], stats: { safe: 0, doubtful: 0, extra: 0, tabs: 0 }, undo: 0 };
+
+const ignoredTabs = new Set();      // "no es duplicada" para una pestaña concreta
+const ignoredGroups = new Set();    // "mantener ambas" para una página en esta sesión
+const intentional = new Set();      // abiertas a propósito desde la misma página (Duplicar pestaña...)
+const pendingChecks = new Map();    // tabId → momento en que cambió su dirección
+const lastKey = new Map();          // tabId → huella estricta anterior
+let undoStack = [];                 // última tanda de pestañas cerradas
+let quietUntil = Date.now() + 5000; // sin avisos durante el arranque (restauración de sesión)
+let createdBurst = [];
+
+// ------------------------------------------------------------------ análisis
+
+const cache = new Map();
+const analyzeCached = (url) => {
+	const k = (settings.anchorsDistinct ? "1" : "0") + url;
+	let a = cache.get(k);
+	if (!a) {
+		if (cache.size > 6000) cache.clear();
+		a = analyze(url, { anchorsDistinct: settings.anchorsDistinct });
+		cache.set(k, a);
+	}
+	return a;
+};
+
+const scopeOf = (tab) => {
+	let s = tab.incognito ? "privada" : "normal";
+	if (settings.separateContainers && tab.cookieStoreId) s += "|" + tab.cookieStoreId;
+	if (settings.scope === "window") s += "|w" + tab.windowId;
+	return s;
+};
+
+const isTrackable = (tab) => tab.url && !tab.url.startsWith(OWN_URL) && !exclusions.some(fn => fn(tab.url));
+
+const tabInfo = (t) => ({
+	id: t.id, windowId: t.windowId, index: t.index, title: t.title || t.url, url: t.url,
+	favIconUrl: t.favIconUrl || "", pinned: t.pinned, active: t.active, discarded: !!t.discarded,
+	cookieStoreId: t.cookieStoreId, incognito: t.incognito, lastAccessed: t.lastAccessed || 0,
+	status: t.status, intentional: intentional.has(t.id), audible: !!t.audible
+});
+
+// Cuál conservar: siempre la fijada; después, según el ajuste.
+const chooseKeep = (tabs) => {
+	const score = (t) => {
+		if (settings.keepPolicy === "newest") return t.id;
+		if (settings.keepPolicy === "recent") return t.lastAccessed;
+		return -t.id; // las pestañas más antiguas tienen identificador menor
+	};
+	return tabs.slice().sort((a, b) => (b.pinned - a.pinned) || (score(b) - score(a)))[0].id;
+};
+
+const mergeDetails = (urls) => {
+	const out = new Set();
+	let title = null;
+	for (let i = 1; i < urls.length; i++) {
+		if (urls[i] === urls[0]) continue;
+		const e = explain(urls[0], urls[i], { anchorsDistinct: settings.anchorsDistinct });
+		e.details.forEach(d => out.add(d));
+		title = title || e.title;
+	}
+	return { title, details: [...out] };
+};
+
+let containers = {};
+const loadContainers = async () => {
+	try {
+		const list = await browser.contextualIdentities.query({});
+		containers = Object.fromEntries(list.map(c => [c.cookieStoreId, { name: c.name, color: c.colorCode }]));
+	} catch { containers = {}; }
+};
+
+const compute = async () => {
+	const all = await browser.tabs.query({});
+	const strictMap = new Map(), looseMap = new Map();
+	let tracked = 0;
+	for (const t of all) {
+		if (!isTrackable(t) || ignoredTabs.has(t.id)) continue;
+		const a = analyzeCached(t.url);
+		if (!a.ok) continue;
+		tracked++;
+		const scope = scopeOf(t);
+		const sk = scope + "§" + a.strict, lk = scope + "§" + a.loose;
+		const info = tabInfo(t);
+		info.strict = a.strict;
+		if (!strictMap.has(sk)) strictMap.set(sk, { a, tabs: [] });
+		strictMap.get(sk).tabs.push(info);
+		if (!looseMap.has(lk)) looseMap.set(lk, { a, tabs: [], stricts: new Set() });
+		const l = looseMap.get(lk);
+		l.tabs.push(info);
+		l.stricts.add(a.strict);
+	}
+
+	const groups = [];
+	let extra = 0;
+	for (const [id, g] of strictMap) {
+		if (g.tabs.length < 2) continue;
+		const urls = g.tabs.map(t => t.url);
+		const identical = urls.every(u => u === urls[0]);
+		const exp = identical ? { title: "Direcciones idénticas", details: ["Las pestañas tienen exactamente la misma dirección."] } : mergeDetails(urls);
+		const ignored = ignoredGroups.has(id);
+		if (!ignored) extra += g.tabs.length - 1;
+		groups.push({
+			id, level: "seguro", identical, ignored, site: g.a.site, what: g.a.what, key: g.a.strict,
+			keepId: chooseKeep(g.tabs), tabs: g.tabs, title: exp.title || "Misma página", details: exp.details
+		});
+	}
+	let doubtful = 0;
+	for (const [id, g] of looseMap) {
+		if (g.stricts.size < 2) continue;
+		const exp = mergeDetails(g.tabs.map(t => t.url));
+		const ignored = ignoredGroups.has(id);
+		if (!ignored) doubtful++;
+		groups.push({
+			id, level: "dudoso", ignored, site: g.a.site, what: g.a.what, key: g.a.loose,
+			keepId: chooseKeep(g.tabs), tabs: g.tabs, title: "Dudoso: casi la misma página", details: exp.details
+		});
+	}
+	const safe = groups.filter(g => g.level === "seguro" && !g.ignored).length;
+	state = { groups, stats: { safe, doubtful, extra, tabs: tracked, total: all.length }, undo: undoStack.length, containers, ignoredTabs: ignoredTabs.size };
+	updateBadge();
+	broadcast({ type: "state", state });
+	handlePendingChecks(all);
+};
+
+let computeTimer = null;
+const scheduleCompute = (delay = 120) => {
+	clearTimeout(computeTimer);
+	computeTimer = setTimeout(() => compute().catch(console.error), delay);
+};
+
+// ------------------------------------------------------------------ insignia
+
+const updateBadge = () => {
+	const { extra, doubtful } = state.stats;
+	let text = "", color = "#d92d20";
+	if (extra > 0) text = String(extra);
+	else if (doubtful > 0) { text = "?"; color = "#dc8a00"; }
+	browser.browserAction.setBadgeText({ text });
+	browser.browserAction.setBadgeBackgroundColor({ color });
+	if (browser.browserAction.setBadgeTextColor) browser.browserAction.setBadgeTextColor({ color: "#ffffff" });
+	const parts = [];
+	parts.push(extra ? `${extra} pestaña${extra > 1 ? "s" : ""} duplicada${extra > 1 ? "s" : ""}` : "Sin duplicados");
+	if (doubtful) parts.push(`${doubtful} caso${doubtful > 1 ? "s" : ""} dudoso${doubtful > 1 ? "s" : ""}`);
+	browser.browserAction.setTitle({ title: "Duplicados · " + parts.join(" · ") });
+};
+
+// ------------------------------------------------------------------ avisos
+
+const handlePendingChecks = async (allTabs) => {
+	if (!pendingChecks.size) return;
+	const now = Date.now();
+	const checks = [...pendingChecks.keys()];
+	pendingChecks.clear();
+	if (now < quietUntil) return;
+
+	for (const tabId of checks) {
+		const g = state.groups.find(x => x.level === "seguro" && !x.ignored && x.tabs.some(t => t.id === tabId))
+			|| (settings.alertDoubtful && state.groups.find(x => x.level === "dudoso" && !x.ignored && x.tabs.some(t => t.id === tabId)));
+		if (!g || intentional.has(tabId)) continue;
+		const tab = g.tabs.find(t => t.id === tabId);
+		const others = g.tabs.filter(t => t.id !== tabId);
+		const mode = settings.onDuplicate;
+
+		if (mode === "close" && g.level === "seguro" && !tab.pinned) {
+			const keep = others.find(t => t.id === chooseKeep(others)) || others[0];
+			await closeTabs([tabId], allTabs);
+			try {
+				await browser.tabs.update(keep.id, { active: true });
+				await browser.windows.update(keep.windowId, { focused: true });
+			} catch { /* ya no existe */ }
+			notify(`Se cerró una pestaña duplicada`, `«${trim(tab.title, 70)}» ya estaba abierta. Pulsa aquí para deshacer o ver la lista.`, { groupId: g.id, tabId: keep.id });
+		} else if (mode === "panel" || (mode === "close" && g.level === "dudoso")) {
+			openPanel({ groupId: g.id, tabId });
+		} else if (mode === "notify") {
+			notify(g.level === "seguro" ? "Pestaña duplicada" : "Posible duplicado", `«${trim(tab.title, 70)}» ya está abierta${others.length > 1 ? ` (${others.length} veces)` : ""}. Pulsa para verla.`, { groupId: g.id, tabId });
+		}
+		break; // un aviso por tanda es suficiente
+	}
+};
+
+const trim = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
+
+const notifyTargets = new Map();
+const notify = (title, message, focus) => {
+	const id = "dup-" + Date.now();
+	notifyTargets.set(id, focus);
+	browser.notifications.create(id, { type: "basic", iconUrl: browser.runtime.getURL("icons/icon.svg"), title, message });
+};
+browser.notifications.onClicked.addListener((id) => {
+	openPanel(notifyTargets.get(id));
+	notifyTargets.delete(id);
+	browser.notifications.clear(id);
+});
+
+// ------------------------------------------------------------------ panel
+
+const broadcast = (msg) => { for (const p of ports) { try { p.postMessage(msg); } catch { /* cerrado */ } } };
+
+const openPanel = async (focus) => {
+	if (focus) pendingFocus = focus;
+	if (panelWindowId !== null) {
+		try {
+			const w = await browser.windows.get(panelWindowId);
+			await browser.windows.update(panelWindowId, w.state === "minimized" ? { focused: true, state: "normal" } : { focused: true });
+			if (pendingFocus) { broadcast({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
+			return;
+		} catch { panelWindowId = null; }
+	}
+	// Si el panel lateral está abierto, basta con enfocar ahí.
+	if (focus && [...ports].some(p => p.isSidebar)) {
+		broadcast({ type: "focus", focus: pendingFocus });
+		pendingFocus = null;
+		if (settings.clickAction === "sidebar") return;
+	}
+	const { panelBounds } = await browser.storage.local.get("panelBounds");
+	const b = panelBounds || { width: 600, height: 780 };
+	const opts = { type: "popup", url: browser.runtime.getURL("panel/panel.html?mode=window"), width: b.width, height: b.height };
+	if (Number.isFinite(b.left) && Number.isFinite(b.top)) { opts.left = b.left; opts.top = b.top; }
+	const w = await browser.windows.create(opts);
+	panelWindowId = w.id;
+};
+
+browser.windows.onRemoved.addListener((id) => { if (id === panelWindowId) panelWindowId = null; });
+
+browser.runtime.onConnect.addListener((port) => {
+	if (port.name !== "panel") return;
+	ports.add(port);
+	port.onDisconnect.addListener(() => ports.delete(port));
+	port.onMessage.addListener((msg) => handlePanelMessage(port, msg));
+});
+
+const handlePanelMessage = async (port, msg) => {
+	switch (msg.cmd) {
+		case "hello":
+			port.isSidebar = !!msg.sidebar;
+			if (msg.windowId && !msg.sidebar) panelWindowId = msg.windowId;
+			port.postMessage({ type: "state", state });
+			if (pendingFocus) { port.postMessage({ type: "focus", focus: pendingFocus }); pendingFocus = null; }
+			break;
+		case "bounds":
+			browser.storage.local.set({ panelBounds: msg.bounds });
+			break;
+		case "activate":
+			try {
+				const t = await browser.tabs.update(msg.tabId, { active: true });
+				await browser.windows.update(t.windowId, { focused: true });
+			} catch { /* cerrada */ }
+			break;
+		case "close":
+			await closeTabs(msg.tabIds);
+			break;
+		case "keepOnly": {
+			const g = state.groups.find(x => x.id === msg.groupId);
+			if (g) await closeTabs(g.tabs.filter(t => t.id !== msg.tabId).map(t => t.id));
+			break;
+		}
+		case "closeGroup": {
+			const g = state.groups.find(x => x.id === msg.groupId);
+			if (g) await closeTabs(g.tabs.filter(t => t.id !== g.keepId).map(t => t.id));
+			break;
+		}
+		case "closeAllSafe":
+			await closeAllSafe();
+			break;
+		case "ignoreGroup":
+			ignoredGroups.add(msg.groupId); scheduleCompute(0);
+			break;
+		case "unignoreGroup":
+			ignoredGroups.delete(msg.groupId); scheduleCompute(0);
+			break;
+		case "ignoreTab":
+			ignoredTabs.add(msg.tabId); scheduleCompute(0);
+			break;
+		case "unignoreAll":
+			ignoredTabs.clear(); ignoredGroups.clear(); scheduleCompute(0);
+			break;
+		case "undo":
+			await undo();
+			break;
+		case "refresh":
+			cache.clear(); scheduleCompute(0);
+			break;
+	}
+};
+
+// ------------------------------------------------------------------ cerrar / deshacer
+
+const closeTabs = async (ids, allTabs) => {
+	if (!ids.length) return;
+	const tabs = allTabs || await browser.tabs.query({});
+	const snap = tabs.filter(t => ids.includes(t.id)).map(t => ({
+		url: t.url, title: t.title, windowId: t.windowId, index: t.index, pinned: t.pinned, cookieStoreId: t.cookieStoreId
+	}));
+	undoStack = snap;
+	try { await browser.tabs.remove(ids); } catch (e) { console.warn(e); }
+	scheduleCompute(0);
+};
+
+const closeAllSafe = async () => {
+	const ids = [];
+	for (const g of state.groups) {
+		if (g.level !== "seguro" || g.ignored) continue;
+		for (const t of g.tabs) if (t.id !== g.keepId && !t.pinned) ids.push(t.id);
+	}
+	await closeTabs([...new Set(ids)]);
+};
+
+const undo = async () => {
+	const batch = undoStack;
+	undoStack = [];
+	if (!batch.length) return;
+	// Lo que se reabre al deshacer no debe volver a avisar ni cerrarse solo.
+	quietUntil = Math.max(quietUntil, Date.now() + 2000);
+	let recent = [];
+	try { recent = await browser.sessions.getRecentlyClosed({ maxResults: 25 }); } catch { /* sin permiso */ }
+	for (const s of batch) {
+		const i = recent.findIndex(r => r.tab && r.tab.url === s.url);
+		if (i >= 0) {
+			const [r] = recent.splice(i, 1);
+			try {
+				const restored = await browser.sessions.restore(r.tab.sessionId);
+				if (restored && restored.tab) intentional.add(restored.tab.id);
+				continue;
+			} catch { /* reabrir a mano */ }
+		}
+		const opts = { url: s.url, windowId: s.windowId, index: s.index, pinned: s.pinned, active: false };
+		if (s.cookieStoreId && s.cookieStoreId !== "firefox-default" && s.cookieStoreId !== "firefox-private") opts.cookieStoreId = s.cookieStoreId;
+		try {
+			let t;
+			try { t = await browser.tabs.create(opts); } catch { t = await browser.tabs.create({ url: s.url, active: false }); }
+			intentional.add(t.id);
+		} catch { /* url no permitida */ }
+	}
+	scheduleCompute(0);
+};
+
+// ------------------------------------------------------------------ eventos de pestañas
+
+const markChanged = (tab) => {
+	if (!tab.url || !isTrackable(tab)) return;
+	const a = analyzeCached(tab.url);
+	if (!a.ok) return;
+	const key = scopeOf(tab) + "§" + a.strict;
+	if (lastKey.get(tab.id) === key) return;
+	lastKey.set(tab.id, key);
+	pendingChecks.set(tab.id, Date.now());
+};
+
+// ¿Se abrió desde una pestaña con la misma página? Entonces es a propósito (Duplicar pestaña, etc.).
+const openerChecked = new Set();
+const checkOpener = async (tab) => {
+	if (tab.openerTabId == null || openerChecked.has(tab.id) || !tab.url || !analyzeCached(tab.url).ok) return;
+	openerChecked.add(tab.id);
+	try {
+		const opener = await browser.tabs.get(tab.openerTabId);
+		const a = analyzeCached(tab.url), b = analyzeCached(opener.url);
+		if (a.ok && b.ok && a.strict === b.strict) intentional.add(tab.id);
+	} catch { /* la de origen ya no existe */ }
+};
+
+browser.tabs.onCreated.addListener(async (tab) => {
+	const now = Date.now();
+	createdBurst = createdBurst.filter(t => now - t < 1500);
+	createdBurst.push(now);
+	// Muchas pestañas a la vez = restaurar sesión o abrir un grupo de marcadores: no avisar.
+	if (createdBurst.length > 4) quietUntil = Math.max(quietUntil, now + 2500);
+	await checkOpener(tab);
+	markChanged(tab);
+	scheduleCompute();
+});
+
+browser.tabs.onUpdated.addListener(async (tabId, change, tab) => {
+	if (change.url) {
+		await checkOpener(tab);
+		markChanged(tab);
+		scheduleCompute();
+	} else if (change.title || change.favIconUrl || change.pinned !== undefined || change.discarded !== undefined || change.status === "complete") {
+		scheduleCompute(250);
+	}
+});
+
+browser.tabs.onRemoved.addListener((tabId) => {
+	lastKey.delete(tabId); openerChecked.delete(tabId); ignoredTabs.delete(tabId); intentional.delete(tabId); pendingChecks.delete(tabId);
+	scheduleCompute();
+});
+browser.tabs.onAttached.addListener(() => scheduleCompute());
+browser.tabs.onActivated.addListener(() => scheduleCompute(300));
+
+// ------------------------------------------------------------------ icono, atajos y menús
+
+browser.browserAction.onClicked.addListener(() => {
+	if (settings.clickAction === "sidebar") browser.sidebarAction.toggle();
+	else openPanel();
+});
+
+browser.commands.onCommand.addListener((cmd) => {
+	if (cmd === "open-panel") openPanel();
+	else if (cmd === "close-safe") closeAllSafe();
+});
+
+const setupMenus = () => {
+	browser.menus.removeAll();
+	browser.menus.create({ id: "show", title: "Ver duplicados de esta pestaña", contexts: ["tab"] });
+	browser.menus.create({ id: "ignore", title: "No es duplicada: ignorar esta pestaña", contexts: ["tab"] });
+	browser.menus.create({ id: "close-safe", title: "Cerrar todos los duplicados seguros", contexts: ["browser_action"] });
+	browser.menus.create({ id: "sidebar", title: "Abrir en el panel lateral", contexts: ["browser_action"] });
+	browser.menus.create({ id: "window", title: "Abrir en ventana ajustable", contexts: ["browser_action"] });
+};
+browser.menus.onClicked.addListener((info, tab) => {
+	if (info.menuItemId === "sidebar") { browser.sidebarAction.open(); return; }
+	if (info.menuItemId === "window") openPanel();
+	else if (info.menuItemId === "close-safe") closeAllSafe();
+	else if (info.menuItemId === "ignore" && tab) { ignoredTabs.add(tab.id); scheduleCompute(0); }
+	else if (info.menuItemId === "show" && tab) {
+		const g = state.groups.find(x => x.tabs.some(t => t.id === tab.id));
+		openPanel(g ? { groupId: g.id, tabId: tab.id } : { message: "Esta pestaña no tiene duplicados." });
+	}
+});
+
+// ------------------------------------------------------------------ arranque
+
+const applySettings = (s) => {
+	settings = s;
+	exclusions = DupSettings.compileExclusions(s.exclusions);
+	cache.clear();
+};
+
+// Huellas de lo que ya está abierto: no genera avisos, solo lo que cambie después.
+const seedKeys = async () => {
+	lastKey.clear();
+	for (const t of await browser.tabs.query({})) {
+		if (!t.url || !isTrackable(t)) continue;
+		const a = analyzeCached(t.url);
+		if (a.ok) lastKey.set(t.id, scopeOf(t) + "§" + a.strict);
+	}
+};
+
+browser.storage.onChanged.addListener((changes, area) => {
+	if (area === "local" && changes.settings) {
+		DupSettings.load().then(async s => { applySettings(s); await seedKeys(); scheduleCompute(0); });
+	}
+});
+
+if (browser.contextualIdentities && browser.contextualIdentities.onCreated) {
+	for (const ev of ["onCreated", "onRemoved", "onUpdated"]) browser.contextualIdentities[ev].addListener(() => loadContainers().then(() => scheduleCompute(0)));
+}
+
+(async () => {
+	applySettings(await DupSettings.load());
+	await loadContainers();
+	setupMenus();
+	await seedKeys();
+	await compute();
+})();

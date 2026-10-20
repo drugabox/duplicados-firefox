@@ -1,0 +1,16 @@
+{
+  "name": "duplicados-firefox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extensión privada de Firefox para detectar pestañas duplicadas",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lint": "npx --yes web-ext@8 lint",
+    "build": "npx --yes web-ext@8 build -a dist --overwrite-dest",
+    "start": "npx --yes web-ext@8 run"
+  },
+  "webExt": {
+    "sourceDir": ".",
+    "ignoreFiles": ["test", "package.json", "README.md", "dist", "web-ext-artifacts"]
+  }
+}

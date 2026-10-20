@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="es" data-theme="auto">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Duplicados</title>
+	<link rel="icon" href="../icons/icon.svg">
+	<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+	<header class="topbar">
+		<div class="brand">
+			<img src="../icons/icon.svg" alt="" width="22" height="22">
+			<h1>Duplicados</h1>
+			<div class="stats" id="stats" aria-live="polite"></div>
+		</div>
+		<nav class="views" role="tablist">
+			<button role="tab" data-view="lista" aria-selected="true">Lista</button>
+			<button role="tab" data-view="ajustes">Ajustes</button>
+			<button role="tab" data-view="ayuda">Cómo funciona</button>
+		</nav>
+	</header>
+
+	<!-- ============================================================ LISTA -->
+	<main id="view-lista" class="view">
+		<div class="toolbar">
+			<label class="search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+				<input id="search" type="search" placeholder="Buscar por título o dirección…  ( / )" autocomplete="off">
+			</label>
+			<div class="seg" id="filters" role="radiogroup" aria-label="Filtrar">
+				<button data-filter="todos" aria-pressed="true">Todos</button>
+				<button data-filter="seguro" aria-pressed="false">Seguros</button>
+				<button data-filter="dudoso" aria-pressed="false">Dudosos</button>
+				<button data-filter="ignorado" aria-pressed="false">Ignorados</button>
+			</div>
+			<div class="actions">
+				<button id="undo" class="btn ghost" hidden title="Volver a abrir lo último que se cerró">↶ Deshacer</button>
+				<button id="closeAll" class="btn primary" disabled>Cerrar duplicados</button>
+			</div>
+		</div>
+		<div id="banner" class="banner" hidden></div>
+		<div id="groups" class="groups"></div>
+		<div id="empty" class="empty" hidden>
+			<div class="empty-icon">✓</div>
+			<h2>No hay pestañas duplicadas</h2>
+			<p>Cuando abras una página que ya tengas abierta, aparecerá aquí.</p>
+		</div>
+	</main>
+
+	<!-- ============================================================ AJUSTES -->
+	<main id="view-ajustes" class="view" hidden>
+		<form id="settings" class="settings" autocomplete="off">
+
+			<section class="card">
+				<h2>Al abrir una pestaña que ya estaba abierta</h2>
+				<div class="choices">
+					<label class="choice"><input type="radio" name="onDuplicate" value="panel">
+						<span><strong>Avisarme abriendo la lista</strong><small>Se abre esta ventana y salta directamente a la pareja duplicada. (Recomendado)</small></span></label>
+					<label class="choice"><input type="radio" name="onDuplicate" value="notify">
+						<span><strong>Solo una notificación</strong><small>Un aviso discreto del sistema; al pulsarlo se abre la lista.</small></span></label>
+					<label class="choice"><input type="radio" name="onDuplicate" value="badge">
+						<span><strong>No avisar</strong><small>Solo se actualiza el número del icono.</small></span></label>
+					<label class="choice"><input type="radio" name="onDuplicate" value="close">
+						<span><strong>Cerrar la nueva automáticamente</strong><small>Te lleva a la que ya estaba abierta. Solo con duplicados seguros; se puede deshacer.</small></span></label>
+				</div>
+				<label class="switch"><input type="checkbox" name="alertDoubtful"><span></span>Avisar también de los casos dudosos</label>
+			</section>
+
+			<section class="card">
+				<h2>Qué se considera duplicado</h2>
+				<div class="field">
+					<span class="label">Buscar duplicados en</span>
+					<div class="seg">
+						<label><input type="radio" name="scope" value="all"><span>Todas las ventanas</span></label>
+						<label><input type="radio" name="scope" value="window"><span>Solo la misma ventana</span></label>
+					</div>
+				</div>
+				<label class="switch"><input type="checkbox" name="separateContainers"><span></span>Los contenedores son mundos aparte <small>(la misma página en «Trabajo» y en «Personal» no es duplicada)</small></label>
+				<label class="switch"><input type="checkbox" name="anchorsDistinct"><span></span>Distinguir secciones de una página <small>(<code>pagina#historia</code> y <code>pagina#precios</code> serán dudosos en vez de duplicados)</small></label>
+				<div class="field">
+					<label class="label" for="exclusions">Nunca comprobar estas webs</label>
+					<textarea id="exclusions" name="exclusions" rows="4" spellcheck="false" placeholder="Una por línea, por ejemplo:&#10;mail.google.com&#10;ejemplo.com/panel/*"></textarea>
+					<small class="hint">Un dominio incluye sus subdominios. Usa <code>*</code> como comodín.</small>
+				</div>
+			</section>
+
+			<section class="card">
+				<h2>Comprobar dos direcciones</h2>
+				<p class="hint">Pega dos direcciones y te explico si las consideraría duplicadas y por qué.</p>
+				<input id="testA" class="input" type="url" placeholder="https://…">
+				<input id="testB" class="input" type="url" placeholder="https://…">
+				<div id="testResult" class="test-result" hidden></div>
+			</section>
+
+			<section class="card">
+				<h2>Al cerrar duplicados, conservar</h2>
+				<div class="seg">
+					<label><input type="radio" name="keepPolicy" value="oldest"><span>La más antigua</span></label>
+					<label><input type="radio" name="keepPolicy" value="newest"><span>La más nueva</span></label>
+					<label><input type="radio" name="keepPolicy" value="recent"><span>La última que usé</span></label>
+				</div>
+				<p class="hint">Las pestañas fijadas siempre se conservan. La elegida aparece marcada con ★ en la lista.</p>
+			</section>
+
+			<section class="card">
+				<h2>Al pulsar el icono</h2>
+				<div class="seg">
+					<label><input type="radio" name="clickAction" value="window"><span>Ventana ajustable</span></label>
+					<label><input type="radio" name="clickAction" value="sidebar"><span>Panel lateral</span></label>
+				</div>
+				<p class="hint">La ventana se puede redimensionar y mover a tu gusto; recuerda su tamaño y posición. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
+			</section>
+
+			<section class="card">
+				<h2>Apariencia</h2>
+				<div class="themes" id="themes"></div>
+				<div class="custom-colors" id="customColors" hidden></div>
+				<div class="grid2">
+					<div class="field">
+						<span class="label">Color de acento</span>
+						<div class="row">
+							<input type="color" name="accent" id="accent">
+							<button type="button" class="btn ghost small" id="accentReset">Usar el del tema</button>
+						</div>
+					</div>
+					<div class="field">
+						<span class="label">Densidad</span>
+						<div class="seg">
+							<label><input type="radio" name="density" value="compact"><span>Compacta</span></label>
+							<label><input type="radio" name="density" value="normal"><span>Normal</span></label>
+							<label><input type="radio" name="density" value="comfy"><span>Amplia</span></label>
+						</div>
+					</div>
+					<div class="field">
+						<label class="label" for="fontSize">Tamaño del texto <output id="fontSizeOut"></output></label>
+						<input type="range" id="fontSize" name="fontSize" min="11" max="20" step="1">
+					</div>
+					<div class="field">
+						<label class="label" for="radius">Redondeo de esquinas <output id="radiusOut"></output></label>
+						<input type="range" id="radius" name="radius" min="0" max="20" step="1">
+					</div>
+				</div>
+				<label class="switch"><input type="checkbox" name="showFavicons"><span></span>Mostrar iconos de las webs</label>
+				<div class="field">
+					<span class="label">Direcciones</span>
+					<div class="seg">
+						<label><input type="radio" name="urlDisplay" value="full"><span>Completas</span></label>
+						<label><input type="radio" name="urlDisplay" value="short"><span>Abreviadas</span></label>
+					</div>
+				</div>
+			</section>
+
+			<section class="card">
+				<h2>Copia de seguridad</h2>
+				<div class="row wrap">
+					<button type="button" class="btn ghost" id="export">Exportar ajustes</button>
+					<label class="btn ghost">Importar ajustes<input type="file" id="import" accept="application/json" hidden></label>
+					<button type="button" class="btn danger-ghost" id="reset">Restablecer todo</button>
+				</div>
+			</section>
+		</form>
+	</main>
+
+	<!-- ============================================================ AYUDA -->
+	<main id="view-ayuda" class="view prose" hidden>
+		<section class="card">
+			<h2>La idea</h2>
+			<p>Dos pestañas son duplicadas cuando <strong>muestran la misma página</strong>. Para saberlo se mira <strong>solo la dirección (URL)</strong>, nunca el título: los títulos de una misma web se parecen demasiado (todos los perfiles de Instagram, todos los vídeos de YouTube…) y eso provoca falsos duplicados.</p>
+		</section>
+		<section class="card">
+			<h2>Tres resultados posibles</h2>
+			<ul class="legend">
+				<li><span class="pill safe">Duplicado</span> Es la misma página aunque la dirección se escriba algo distinta. Se puede cerrar sin miedo.</li>
+				<li><span class="pill doubt">Dudoso</span> Muestra casi lo mismo, pero con un matiz: otro minuto del mismo vídeo, el mismo vídeo dentro de una lista, otra hoja del mismo documento, el modo lectura… Tú decides.</li>
+				<li><span class="pill neutral">Distintas</span> Todo lo demás. No aparecen en la lista.</li>
+			</ul>
+		</section>
+		<section class="card">
+			<h2>Qué se ignora al comparar (sigue siendo la misma página)</h2>
+			<ul>
+				<li><code>http</code> o <code>https</code>, <code>www.</code> o sin él, la versión móvil (<code>m.</code>).</li>
+				<li>La barra <code>/</code> final y el orden de los parámetros.</li>
+				<li>Parámetros de rastreo: <code>utm_…</code>, <code>fbclid</code>, <code>gclid</code>, <code>si</code>, <code>igsh</code>… No cambian la página, solo dicen de dónde vienes.</li>
+				<li>El salto a una sección (<code>#historia</code>), salvo que lo configures distinto. Ojo: en webs como Gmail lo que va tras <code>#</code> sí indica otra página, y se respeta.</li>
+			</ul>
+		</section>
+		<section class="card">
+			<h2>Reglas especiales por web</h2>
+			<ul>
+				<li><strong>YouTube</strong>: <code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>. Cada lista (<code>list=</code>), canal y sección del canal (<code>/videos</code>, <code>/shorts</code>…) es una página distinta. El mismo vídeo en otro minuto → dudoso.</li>
+				<li><strong>Instagram</strong>: cada perfil es una página distinta; el nombre de usuario no distingue mayúsculas, el código de una publicación sí.</li>
+				<li><strong>X / Twitter</strong>: <code>twitter.com</code> = <code>x.com</code>; un tuit se reconoce por su número.</li>
+				<li><strong>Reddit</strong>: <code>old.</code>, <code>www.</code> y el título de la URL no importan; manda el identificador del hilo.</li>
+				<li><strong>Wikipedia</strong>, <strong>Google</strong> (búsquedas), <strong>Amazon</strong> (producto = código ASIN), <strong>Google Docs/Drive</strong> (mismo archivo aunque sea <code>/edit</code> o <code>/view</code>), <strong>GitHub</strong>, <strong>Spotify</strong>, <strong>TikTok</strong>, <strong>Facebook</strong>.</li>
+			</ul>
+			<p class="hint">Si dudas de un caso concreto, usa <em>Ajustes → Comprobar dos direcciones</em>: te dice qué ha comparado y por qué.</p>
+		</section>
+		<section class="card">
+			<h2>Lo que nunca se considera duplicado</h2>
+			<ul>
+				<li>Pestañas vacías o de «Nueva pestaña».</li>
+				<li>La misma página en <strong>ventanas privadas</strong> y normales, ni (por defecto) en <strong>contenedores</strong> distintos: son sesiones diferentes.</li>
+				<li>Pestañas abiertas a propósito desde la misma página (por ejemplo con «Duplicar pestaña»): aparecen en la lista, pero no generan avisos.</li>
+				<li>Las webs que añadas a la lista de exclusión.</li>
+			</ul>
+		</section>
+		<section class="card">
+			<h2>Funcionamiento</h2>
+			<ul>
+				<li><strong>El número del icono</strong> indica cuántas pestañas sobran. Un <strong>?</strong> naranja significa que solo hay casos dudosos.</li>
+				<li><strong>Al abrir un duplicado</strong> se abre esta lista y salta a esa pareja (configurable).</li>
+				<li><strong>Cerrar duplicados</strong> cierra todas las sobrantes de los grupos seguros y conserva una de cada grupo (★). Nunca cierra fijadas ni dudosos.</li>
+				<li><strong>Deshacer</strong> vuelve a abrir lo último que se cerró, con su historial.</li>
+				<li><strong>Mantener todas</strong> deja de avisar de esa página durante la sesión.</li>
+				<li>Clic derecho en una pestaña → «No es duplicada» o «Ver duplicados de esta pestaña».</li>
+				<li>Teclado: <kbd>/</kbd> buscar · <kbd>↑</kbd><kbd>↓</kbd> moverse · <kbd>Intro</kbd> ir · <kbd>Supr</kbd> cerrar · <kbd>K</kbd> conservar solo esa.</li>
+			</ul>
+		</section>
+	</main>
+
+	<div id="toast" class="toast" role="status" hidden></div>
+
+	<script src="../lib/normalize.js"></script>
+	<script src="../lib/settings.js"></script>
+	<script src="panel.js"></script>
+</body>
+</html>
