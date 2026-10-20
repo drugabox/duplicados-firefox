@@ -10,6 +10,10 @@ const SEGURO = [
 	["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ"],
 	["https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=abc", "https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ"],
 	["https://www.youtube.com/watch?v=abc&t=90", "https://youtu.be/abc?t=1m30s"],
+	// Mismo vídeo en otro minuto o abierto desde una lista: es el mismo vídeo
+	["https://www.youtube.com/watch?v=abc", "https://www.youtube.com/watch?v=abc&t=120"],
+	["https://www.youtube.com/watch?v=abc&t=5s", "https://youtu.be/abc?t=3600"],
+	["https://www.youtube.com/watch?v=abc", "https://www.youtube.com/watch?v=abc&list=PL1&index=3"],
 	["https://www.youtube.com/@eldescampaopodcast", "https://www.youtube.com/@ElDescampaoPodcast/featured"],
 	["https://www.youtube.com/playlist?list=PLfnlhgwRalOIhXXcV7shVUDthLucCkkqU", "https://youtube.com/playlist?list=PLfnlhgwRalOIhXXcV7shVUDthLucCkkqU&si=xyz"],
 	["https://www.instagram.com/nasa/", "https://instagram.com/NASA?igsh=MTIz"],
@@ -62,8 +66,6 @@ const DISTINTO = [
 ];
 
 const DUDOSO = [
-	["https://www.youtube.com/watch?v=abc", "https://www.youtube.com/watch?v=abc&t=120"],
-	["https://www.youtube.com/watch?v=abc", "https://www.youtube.com/watch?v=abc&list=PL1&index=3"],
 	["https://www.youtube.com/watch?v=abc", "https://www.youtube.com/shorts/abc"],
 	["https://www.instagram.com/p/AbC123/", "https://www.instagram.com/reel/AbC123/"],
 	["https://example.com/page", "https://example.com/page?ref=newsletter"],

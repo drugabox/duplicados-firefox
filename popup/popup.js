@@ -1,7 +1,10 @@
-/* Ventanita del icono: lista directa de duplicados. */
+/* Ventanita del icono (y ventana grande): lista directa de duplicados, como la original. */
 "use strict";
 
 const $ = (s) => document.querySelector(s);
+
+const mode = new URLSearchParams(location.search).get("mode") === "window" ? "window" : "popup";
+document.documentElement.dataset.mode = mode;
 
 let settings = { ...DupSettings.DEFAULTS };
 let state = null;
@@ -39,25 +42,6 @@ port.onMessage.addListener((msg) => {
 
 // ------------------------------------------------------------------ lista
 
-const safeDecode = (s) => { try { return decodeURI(s); } catch { return s; } };
-
-// Trozos de la dirección para mostrar solo lo que cambia entre pestañas del grupo.
-const tokens = (url) => {
-	try {
-		const u = new URL(url);
-		const t = [u.host, safeDecode(u.pathname)];
-		for (const [k, v] of u.searchParams) t.push(k + (v ? "=" + v : ""));
-		if (u.hash) t.push(safeDecode(u.hash));
-		return t;
-	} catch { return [url]; }
-};
-const diffText = (tab, group) => {
-	if (group.identical) return "";
-	const others = group.tabs.filter(t => t.id !== tab.id).map(t => new Set(tokens(t.url)));
-	const mine = tokens(tab.url).filter(tk => others.some(o => !o.has(tk)));
-	return mine.length ? mine.join("  ") : "";
-};
-
 const letter = (url) => {
 	let ch = "?";
 	try { ch = new URL(url).hostname.replace(/^www\./, "").charAt(0).toUpperCase() || "?"; } catch { /* interna */ }
@@ -71,61 +55,50 @@ const favicon = (t) => {
 	return img;
 };
 
-const go = (tabId) => { send({ cmd: "activate", tabId }); setTimeout(() => window.close(), 60); };
+const go = (tabId) => { send({ cmd: "activate", tabId }); if (mode === "popup") setTimeout(() => window.close(), 60); };
 
-const renderGroup = (g, wins) => {
-	let host = "";
-	try { host = new URL(g.tabs[0].url).hostname.replace(/^www\./, ""); } catch { /* interna */ }
-	const label = (g.what ? g.what + " · " : "") + (host || g.site);
-	const head = h("div", { class: "ghead" },
-		h("span", { class: "dot", title: g.level === "seguro" ? "Duplicado" : "Dudoso" }),
-		h("span", { class: "gname", title: g.title + (g.details.length ? ": " + g.details.join(" ") : "") }, label),
-		g.level === "seguro" ? h("button", { class: "link", title: "Cerrar todas menos la marcada con ★", onclick: () => send({ cmd: "closeGroup", groupId: g.id }) }, "Cerrar sobrantes") : null);
+// Al posarse encima: la dirección completa y, debajo, por qué se agrupa.
+const tooltip = (t, g) => [t.url, "", g.title + (g.details.length ? ": " + g.details.join(" ") : ""),
+	g.level === "seguro" && t.id === g.keepId ? "★ Es la que se conserva al cerrar duplicados." : ""].filter((x, i) => x || i === 1).join("\n").trim();
 
+const renderGroup = (g) => {
 	const rows = g.tabs.map(t => {
-		const diff = diffText(t, g);
-		const tags = [];
-		if (t.id === newTabId) tags.push(h("span", { class: "tag new" }, "nueva"));
-		if (g.level === "seguro" && t.id === g.keepId) tags.push(h("span", { class: "tag keep", title: "Se conserva al cerrar sobrantes" }, "★"));
-		if (t.pinned) tags.push(h("span", { class: "tag", title: "Fijada" }, "📌"));
-		// Ventana y contenedor solo si ayudan a distinguir las pestañas del grupo.
-		if (new Set(g.tabs.map(x => x.windowId)).size > 1) tags.push(h("span", { class: "tag", title: "Ventana " + wins.get(t.windowId) }, "V" + wins.get(t.windowId)));
-		const c = state.containers && state.containers[t.cookieStoreId];
-		if (c && new Set(g.tabs.map(x => x.cookieStoreId)).size > 1) tags.push(h("span", { class: "tag", style: `color:${c.color}` }, c.name));
-		return h("div", { class: "row" + (t.id === newTabId ? " new" : ""), tabindex: "0", "data-tab": t.id, title: t.url, onclick: () => go(t.id) },
+		const extra = g.level === "seguro" && t.id !== g.keepId && !t.pinned;
+		const cls = ["row", extra ? "extra" : "", t.active ? "active" : "", t.id === newTabId ? "new" : ""].filter(Boolean).join(" ");
+		return h("div", { class: cls, tabindex: "0", "data-tab": t.id, title: tooltip(t, g), onclick: () => go(t.id) },
 			favicon(t),
-			h("div", { class: "txt" }, h("div", { class: "title" }, t.title || t.url), diff ? h("div", { class: "diff" }, diff) : null),
-			tags,
+			h("span", { class: "title" }, t.title || t.url),
+			t.id === newTabId ? h("span", { class: "tag new" }, "nueva") : null,
+			t.pinned ? h("span", { class: "tag", title: "Fijada" }, "📌") : null,
 			h("button", { class: "icon x", title: "Cerrar esta pestaña", "aria-label": "Cerrar", onclick: (e) => { e.stopPropagation(); send({ cmd: "close", tabIds: [t.id] }); } }, svgIcon("M6 6l12 12M18 6L6 18")));
 	});
-	return h("div", { class: `group ${g.level}`, "data-id": g.id }, head, rows);
+	return h("div", { class: `group ${g.level}`, "data-id": g.id }, rows);
 };
 
 const render = () => {
 	if (!state) return;
 	const safe = state.groups.filter(g => g.level === "seguro" && !g.ignored);
 	const doubt = state.groups.filter(g => g.level === "dudoso" && !g.ignored);
-	const { extra } = state.stats;
-
-	$("#summary").textContent = extra ? `· ${extra} sobra${extra > 1 ? "n" : ""}` : doubt.length ? "· solo dudosos" : "· sin duplicados";
 	const closable = safe.reduce((n, g) => n + g.tabs.filter(t => t.id !== g.keepId && !t.pinned).length, 0);
+
+	const count = $("#count");
+	count.textContent = closable ? String(closable) : doubt.length ? "" : "0";
+	count.className = "count" + (closable ? "" : " zero");
+	count.title = closable ? `${closable} pestaña${closable > 1 ? "s" : ""} de sobra` : "Sin duplicados";
 	const btn = $("#closeAll");
 	btn.disabled = !closable;
-	btn.textContent = closable ? `Cerrar ${closable} duplicado${closable > 1 ? "s" : ""}` : "No hay duplicados que cerrar";
+	btn.textContent = closable ? `Cerrar ${closable} duplicado${closable > 1 ? "s" : ""}` : "No hay duplicados";
 	$("#undo").hidden = !state.undo;
 
-	const ids = [...new Set(state.groups.flatMap(g => g.tabs.map(t => t.windowId)))].sort((a, b) => a - b);
-	const wins = new Map(ids.map((id, i) => [id, i + 1]));
 	const list = $("#list");
 	const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tab : null;
 	const frag = document.createDocumentFragment();
-
-	safe.forEach(g => frag.append(renderGroup(g, wins)));
+	safe.forEach(g => frag.append(renderGroup(g)));
 	if (doubt.length) {
 		const open = showDoubtful || !safe.length;
-		frag.append(h("button", { class: "more", onclick: () => { showDoubtful = !open; render(); } },
-			(open ? "▾ " : "▸ ") + `Dudosos (${doubt.length})`, h("span", { style: "flex:1" }), open ? "" : "revísalos tú"));
-		if (open) doubt.forEach(g => frag.append(renderGroup(g, wins)));
+		frag.append(h("button", { class: "section", title: "Casi la misma página, con un matiz. Nunca se cierran solos.", onclick: () => { showDoubtful = !open; render(); } },
+			h("span", { class: "dot" }), (open ? "▾ " : "▸ ") + `Dudosos (${doubt.length})`));
+		if (open) doubt.forEach(g => frag.append(renderGroup(g)));
 	}
 	if (!safe.length && !doubt.length) frag.append(h("div", { class: "empty" }, "No hay pestañas duplicadas."));
 	list.replaceChildren(frag);
@@ -136,30 +109,46 @@ const applyFocus = (f) => {
 	if (!f) return;
 	if (f.message) { note(f.message); pendingFocus = null; return; }
 	const g = state && state.groups.find(x => x.id === f.groupId);
-	if (!g) { pendingFocus = (f.tries || 0) > 3 ? null : { ...f, tries: (f.tries || 0) + 1 }; return; }
+	if (!g) { pendingFocus = (f.tries || 0) > 5 ? null : { ...f, tries: (f.tries || 0) + 1 }; return; }
 	pendingFocus = null;
 	newTabId = f.tabId || null;
 	if (g.level === "dudoso") showDoubtful = true;
 	render();
 	const el = document.querySelector(`.group[data-id="${CSS.escape(g.id)}"]`);
 	if (!el) return;
+	el.classList.remove("flash");
+	void el.offsetWidth;
 	el.classList.add("flash");
-	el.scrollIntoView({ block: "nearest" });
+	el.scrollIntoView({ block: "center" });
 	(el.querySelector(`.row[data-tab="${f.tabId}"]`) || el.querySelector(".row"))?.focus({ preventScroll: true });
 	note(g.level === "seguro" ? "Ya tenías esta página abierta." : "Ya tenías abierta una página muy parecida.");
 };
 
-const note = (text) => { const n = $("#note"); n.textContent = text; n.hidden = false; };
+let noteTimer = null;
+const note = (text) => {
+	const n = $("#note");
+	n.textContent = text;
+	n.hidden = false;
+	clearTimeout(noteTimer);
+	noteTimer = setTimeout(() => { n.hidden = true; }, 10000);
+};
 
 $("#closeAll").addEventListener("click", () => send({ cmd: "closeAllSafe" }));
 $("#undo").addEventListener("click", () => send({ cmd: "undo" }));
 $("#openWindow").addEventListener("click", () => { send({ cmd: "openWindow" }); setTimeout(() => window.close(), 60); });
+$("#openTab").addEventListener("click", () => { send({ cmd: "openPage" }); if (mode === "popup") setTimeout(() => window.close(), 60); });
+$("#allSettings").addEventListener("click", () => { send({ cmd: "openPage", view: "ajustes" }); if (mode === "popup") setTimeout(() => window.close(), 60); });
+$("#toggleOpts").addEventListener("click", () => {
+	const open = $("#opts").hidden;
+	$("#opts").hidden = !open;
+	$("#toggleOpts").setAttribute("aria-expanded", String(open));
+	DupSettings.save({ popupOptsOpen: open });
+});
 $("#preset").addEventListener("change", (e) => DupSettings.save({ preset: e.target.value }));
-$("#openTab").addEventListener("click", () => { send({ cmd: "openPage" }); setTimeout(() => window.close(), 60); });
-$("#openSettings").addEventListener("click", () => { send({ cmd: "openPage", view: "ajustes" }); setTimeout(() => window.close(), 60); });
 $("#onDuplicate").addEventListener("change", (e) => DupSettings.save({ onDuplicate: e.target.value }));
 
 document.addEventListener("keydown", (e) => {
+	if (/^(SELECT|INPUT)$/.test(e.target.tagName)) return;
 	const rows = [...document.querySelectorAll(".row")];
 	const i = rows.indexOf(document.activeElement);
 	if (e.key === "ArrowDown") { e.preventDefault(); (rows[i + 1] || rows[0])?.focus(); }
@@ -168,12 +157,15 @@ document.addEventListener("keydown", (e) => {
 	else if (i >= 0 && (e.key === "Delete" || e.key === "Backspace")) { send({ cmd: "close", tabIds: [Number(rows[i].dataset.tab)] }); (rows[i + 1] || rows[i - 1])?.focus(); }
 });
 
-// ------------------------------------------------------------------ tamaño (asa inferior: alto; esquina: alto y ancho)
+// ------------------------------------------------------------------ tamaño
 
 const applySize = () => {
+	if (mode !== "popup") return;
 	document.body.style.setProperty("--w", settings.popupWidth + "px");
 	document.body.style.setProperty("--h", settings.popupHeight + "px");
 };
+
+// Ventanita: asa inferior = alto; esquina = alto y ancho (límite de Firefox: 800 × 600).
 const grip = $("#grip");
 grip.addEventListener("pointerdown", (e) => {
 	e.preventDefault();
@@ -202,6 +194,19 @@ grip.addEventListener("dblclick", () => {
 	DupSettings.save({ popupWidth, popupHeight });
 });
 
+// Ventana grande: recordar tamaño y posición.
+if (mode === "window") {
+	let last = "";
+	const report = () => {
+		const b = { width: window.outerWidth, height: window.outerHeight, left: window.screenX, top: window.screenY };
+		const sig = JSON.stringify(b);
+		if (sig !== last && b.width > 200 && b.height > 200) { last = sig; send({ cmd: "bounds", bounds: b }); }
+	};
+	let t = null;
+	window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(report, 400); });
+	setInterval(report, 2000); // mover la ventana no genera eventos
+}
+
 // ------------------------------------------------------------------ arranque
 
 (async () => {
@@ -210,5 +215,9 @@ grip.addEventListener("dblclick", () => {
 	await DupTheme.apply(settings, { fontSize: settings.popupFontSize });
 	$("#onDuplicate").value = settings.onDuplicate;
 	$("#preset").value = settings.preset;
-	send({ cmd: "hello", kind: "popup" });
+	$("#opts").hidden = !settings.popupOptsOpen;
+	$("#toggleOpts").setAttribute("aria-expanded", String(!!settings.popupOptsOpen));
+	let windowId = null;
+	try { windowId = (await browser.windows.getCurrent()).id; } catch { /* sin ventana */ }
+	send({ cmd: "hello", kind: mode, windowId: mode === "window" ? windowId : null });
 })();

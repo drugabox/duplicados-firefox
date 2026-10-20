@@ -394,16 +394,11 @@ document.addEventListener("keydown", (e) => {
 
 // ------------------------------------------------------------------ temas
 
+// Vista previa de cada tema: fondo, tarjeta, borde y acento.
 const THEMES = [
 	{ id: "auto", name: "Automático", p: ["#f4f5f9", "#ffffff", "#1d2028", "#4f6bed"] },
-	{ id: "claro", name: "Claro", p: ["#f4f5f9", "#ffffff", "#e1e4ec", "#4f6bed"] },
-	{ id: "oscuro", name: "Oscuro", p: ["#14161c", "#1d2028", "#2f3442", "#7b93ff"] },
+	...DupTheme.LIST.map(t => ({ id: t.id, name: t.name, p: [t.colors.bg, t.colors.surface, t.colors.border, t.colors.accent] })),
 	{ id: "firefox", name: "Como Firefox", p: ["#f0f0f4", "#ffffff", "#1c1b22", "#0061e0"] },
-	{ id: "sepia", name: "Sepia", p: ["#f3ecdf", "#fbf7ef", "#e0d3bb", "#b0602b"] },
-	{ id: "lavanda", name: "Lavanda", p: ["#f5f3fb", "#ffffff", "#e0daf2", "#7c5cdb"] },
-	{ id: "nord", name: "Nord", p: ["#2e3440", "#3b4252", "#4c566a", "#88c0d0"] },
-	{ id: "bosque", name: "Bosque", p: ["#121a16", "#1a251f", "#2d4035", "#5fd393"] },
-	{ id: "contraste", name: "Alto contraste", p: ["#000000", "#000000", "#ffffff", "#ffd400"] },
 	{ id: "custom", name: "Personalizado", p: null }
 ];
 

@@ -84,7 +84,7 @@
 				<h2>Cómo se detectan los duplicados</h2>
 				<div class="choices">
 					<label class="choice"><input type="radio" name="preset" value="inequivoco">
-						<span><strong>Inequívoco <em class="rec">recomendado</em></strong><small>Solo marca como duplicadas las pestañas que son, sin lugar a dudas, la misma página: la misma dirección, aunque cambien detalles que no alteran nada (http/https, «www», la barra final, parámetros de rastreo) o aunque la web la escriba de dos formas (<code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>). Nunca usa el título. Lo que tiene un matiz (otro minuto del vídeo, otra #sección) aparece aparte como dudoso.</small></span></label>
+						<span><strong>Inequívoco <em class="rec">recomendado</em></strong><small>Solo marca como duplicadas las pestañas que son, sin lugar a dudas, la misma página: la misma dirección, aunque cambien detalles que no alteran nada (http/https, «www», la barra final, parámetros de rastreo) o aunque la web la escriba de dos formas (<code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>). Nunca usa el título. El mismo vídeo en otro minuto también es duplicado. Lo que tiene un matiz (otra #sección, un Short frente al vídeo normal) aparece aparte como dudoso.</small></span></label>
 					<label class="choice"><input type="radio" name="preset" value="original">
 						<span><strong>Como Duplicate Tabs Closer</strong><small>Reproduce los ajustes que usabas en la extensión original: ignora mayúsculas, «www» y lo que va tras «#», y además une las pestañas que tienen el mismo título. Sirve para comparar. Ojo: unir por título mezcla páginas distintas que se llaman igual.</small></span></label>
 					<label class="choice"><input type="radio" name="preset" value="personalizado">
@@ -215,7 +215,7 @@
 					<label><input type="radio" name="clickAction" value="tab"><span>Esta página en una pestaña</span></label>
 					<label><input type="radio" name="clickAction" value="sidebar"><span>Panel lateral</span></label>
 				</div>
-				<p class="hint"><b>Ventanita</b>: lo básico, junto al icono. Firefox no deja que pase de 800 × 600 px. <b>Ventana grande</b>: una ventana aparte con todo, de tamaño libre, que recuerda dónde la dejaste; también la usan los avisos. Para cambiar el tamaño de la ventanita, arrastra la barra de abajo (alto) o la esquina inferior derecha (alto y ancho); con doble clic vuelve al tamaño normal. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
+				<p class="hint"><b>Ventanita</b>: lo básico, junto al icono. Firefox no deja que pase de 800 × 600 px. <b>Ventana grande</b>: la misma lista en una ventana aparte, de tamaño libre, que recuerda dónde la dejaste; también la usan los avisos. El límite de 600 px de alto de la ventanita es fijo en Firefox para todas las extensiones; no se puede ampliar. Para cambiar el tamaño de la ventanita, arrastra la barra de abajo (alto) o la esquina inferior derecha (alto y ancho); con doble clic vuelve al tamaño normal. Atajo: <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>D</kbd> (cámbialo en <code>about:addons</code> → ⚙ → Gestionar atajos).</p>
 				<div class="grid2">
 					<div class="field">
 						<label class="label" for="popupWidth">Ancho de la ventanita <output id="popupWidthOut"></output></label>
@@ -328,7 +328,7 @@
 		<section class="card">
 			<h2>Reglas especiales por web</h2>
 			<ul>
-				<li><strong>YouTube</strong>: <code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>. Cada lista (<code>list=</code>), canal y sección del canal (<code>/videos</code>, <code>/shorts</code>…) es una página distinta. El mismo vídeo en otro minuto → dudoso.</li>
+				<li><strong>YouTube</strong>: <code>youtu.be/ID</code> = <code>youtube.com/watch?v=ID</code>, y el mismo vídeo en otro minuto (<code>t=</code>) o abierto desde una lista es duplicado. Cada lista (<code>playlist?list=</code>), canal y sección del canal (<code>/videos</code>, <code>/shorts</code>…) es una página distinta. El mismo vídeo como Short → dudoso.</li>
 				<li><strong>Instagram</strong>: cada perfil es una página distinta; el nombre de usuario no distingue mayúsculas, el código de una publicación sí.</li>
 				<li><strong>X / Twitter</strong>: <code>twitter.com</code> = <code>x.com</code>; un tuit se reconoce por su número.</li>
 				<li><strong>Reddit</strong>: <code>old.</code>, <code>www.</code> y el título de la URL no importan; manda el identificador del hilo.</li>

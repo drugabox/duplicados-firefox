@@ -3,50 +3,55 @@
 <head>
 	<meta charset="utf-8">
 	<title>Duplicados</title>
+	<link rel="icon" href="../icons/icon.svg">
 	<link rel="stylesheet" href="../lib/theme.css">
 	<link rel="stylesheet" href="popup.css">
 </head>
 <body>
 	<header class="head">
-		<strong>Duplicados</strong>
-		<span id="summary" class="summary"></span>
+		<strong>Pestañas duplicadas</strong>
+		<span id="count" class="count"></span>
+		<span class="spacer"></span>
 		<button id="openWindow" class="icon" title="Abrir en ventana grande (tamaño libre)" aria-label="Abrir en ventana grande">
 			<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
 		</button>
-		<button id="openTab" class="icon" title="Abrir en una pestaña (más datos y ajustes)" aria-label="Abrir en una pestaña">
+		<button id="openTab" class="icon" title="Detalles: por qué se agrupan, lista completa y ayuda" aria-label="Detalles">
 			<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
 		</button>
-		<button id="openSettings" class="icon" title="Ajustes" aria-label="Ajustes">
+		<button id="toggleOpts" class="icon" title="Opciones" aria-label="Opciones" aria-expanded="false">
 			<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
 		</button>
 	</header>
 
-	<div class="bar">
-		<button id="closeAll" class="primary" disabled>Cerrar duplicados</button>
-		<button id="undo" class="icon" hidden title="Deshacer: reabrir lo último cerrado" aria-label="Deshacer">
-			<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
-		</button>
+	<div id="opts" class="opts" hidden>
+		<label>Detección
+			<select id="preset" title="Cómo se decide si dos pestañas son duplicadas">
+				<option value="inequivoco">Inequívoca</option>
+				<option value="original">Como la original</option>
+				<option value="personalizado">Personalizada</option>
+			</select>
+		</label>
+		<label>Al abrir un duplicado
+			<select id="onDuplicate">
+				<option value="panel">Mostrar esta lista</option>
+				<option value="notify">Notificación</option>
+				<option value="badge">No avisar</option>
+				<option value="close">Cerrar la nueva</option>
+			</select>
+		</label>
+		<button id="allSettings" class="link">Todos los ajustes…</button>
 	</div>
 
 	<div id="note" class="note" hidden></div>
 	<div id="list" class="list" tabindex="-1"></div>
 
 	<footer class="foot">
-		<label for="preset">Detección</label>
-		<select id="preset" title="Cómo se decide si dos pestañas son duplicadas">
-			<option value="inequivoco">Inequívoca</option>
-			<option value="original">Como la original</option>
-			<option value="personalizado">Personalizada</option>
-		</select>
-		<label for="onDuplicate">Aviso</label>
-		<select id="onDuplicate" title="Qué hacer al abrir una pestaña que ya estaba abierta">
-			<option value="panel">Abrir esta lista</option>
-			<option value="notify">Notificación</option>
-			<option value="badge">No avisar</option>
-			<option value="close">Cerrar la nueva</option>
-		</select>
+		<button id="undo" class="icon" hidden title="Deshacer: reabrir lo último cerrado" aria-label="Deshacer">
+			<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+		</button>
+		<button id="closeAll" class="close-all" disabled>Cerrar duplicados</button>
 	</footer>
-	<div id="grip" class="grip" title="Arrastra: barra = alto, esquina = alto y ancho. Doble clic: tamaño normal. Firefox limita esta ventanita a 800 × 600; para más, usa la ventana grande." aria-hidden="true"></div>
+	<div id="grip" class="grip" title="Arrastra: barra = alto, esquina = alto y ancho. Doble clic: tamaño normal. Firefox no deja que esta ventanita pase de 800 × 600; para más, usa la ventana grande." aria-hidden="true"></div>
 
 	<script src="../lib/normalize.js"></script>
 	<script src="../lib/settings.js"></script>

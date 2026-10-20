@@ -43,7 +43,7 @@ En **Ajustes → Comprobar dos direcciones** puedes pegar dos URL y ver qué se 
 
 | Modo | Para qué |
 |---|---|
-| **Inequívoco** (por defecto) | Lo evidente: solo lo que es, sin lugar a dudas, la misma página. Nada que configurar. Los matices (otro minuto del vídeo, otra `#sección`) aparecen aparte, como dudosos. |
+| **Inequívoco** (por defecto) | Lo evidente: solo lo que es, sin lugar a dudas, la misma página. Nada que configurar. El mismo vídeo de YouTube en otro minuto o abierto desde una lista es duplicado. Los matices (una `#sección`, un Short frente al vídeo normal) aparecen aparte, como dudosos. |
 | **Como Duplicate Tabs Closer** | Tus ajustes de la original (ignora mayúsculas, `www` y `#`, y une por título idéntico). Sirve para comparar. |
 | **Personalizado** | Búsqueda avanzada: todas las opciones de la original (mayúsculas, www, `#`, parámetros, ruta, título idéntico o parecido, reglas de URL y de títulos) y más (http/https, versión móvil, rastreo, reglas por web, parámetros que no cuentan, reglas propias por dominio, mostrar dudosos), cada una explicada. |
 
@@ -66,8 +66,8 @@ wiki.ejemplo.com mayusculas  no distingue mayúsculas en esa web
 ## Funciones
 
 - **Aviso al abrir un duplicado:** se abre la ventanita del icono y salta a esa pareja: la resalta y marca la pestaña «nueva». Necesita Firefox 149 o posterior; en versiones anteriores se abre una ventana aparte. En su lugar puedes elegir una notificación del sistema, no avisar, o cerrar la nueva automáticamente (y deshacer).
-- **Ventanita del icono, limpia y directa** (como la original): botón para cerrar duplicados, la lista con lo que cambia entre cada pareja, y selectores de modo de detección y de aviso. Se estira arrastrando la barra de abajo (alto) o la esquina (alto y ancho), y recuerda el tamaño. Firefox no deja que pase de 800 × 600 px. Doble clic en la barra la devuelve al tamaño normal.
-- **Ventana grande** (botón ▭ de la ventanita, clic derecho en el icono, o como acción del icono): una ventana aparte con todo, de tamaño libre, que recuerda su tamaño y posición. Si la eliges como acción del icono, los avisos también la usan.
+- **Ventanita del icono, como la original:** una línea por pestaña; la que se conserva, normal, y las que sobran, tachadas; la que estás viendo, destacada; la dirección y el motivo al pasar el ratón; botón para cerrar duplicados y deshacer. Las opciones rápidas (modo de detección y aviso) se despliegan con ⚙. Se estira arrastrando la barra de abajo o la esquina. **Firefox no deja que pase de 800 × 600 px** (es un límite fijo del navegador para todas las extensiones); para más, la ventana grande.
+- **Ventana grande** (botón ▭ de la ventanita, clic derecho en el icono, o como acción del icono): la misma lista sencilla en una ventana aparte, de tamaño libre, que recuerda su tamaño y posición. Si Firefox no deja abrir la ventanita al avisar de un duplicado, se abre esta automáticamente con la pareja seleccionada.
 - **Página completa en su propia pestaña** (botón ⤢ de la ventanita, o clic derecho en el icono): todos los datos, todos los ajustes y la ayuda. También funciona como **panel lateral** de Firefox.
 - **Lista clara:** resalta en cada URL la parte que cambia, explica el motivo, indica qué pestaña se conservará (★) y muestra la ventana, el contenedor, si está fijada, dormida o sonando.
 - **Cerrar duplicados** de golpe o por grupo, **conservar solo esta**, **Deshacer** (reabre con su historial).
@@ -75,7 +75,7 @@ wiki.ejemplo.com mayusculas  no distingue mayúsculas en esa web
 - **No molesta:** al restaurar la sesión o abrir muchas pestañas a la vez no avisa, y las pestañas abiertas a propósito desde la misma página («Duplicar pestaña») no generan avisos.
 - **Respeta las sesiones:** las ventanas privadas y, por defecto, los contenedores distintos nunca se mezclan.
 - **Lista de exclusión** de webs, con comodines.
-- **Temas:** Automático, Claro, Oscuro, Como Firefox (copia los colores de tu tema), Sepia, Lavanda, Nord, Bosque, Alto contraste y Personalizado (8 colores). Además puedes elegir el color de acento, la densidad, el tamaño del texto, el redondeo de las esquinas, los iconos y las URL completas o abreviadas. Los cambios se ven al instante.
+- **Temas:** Automático (claro u oscuro según el sistema), Claro, Oscuro, Catppuccin (Latte, Frappé, Macchiato, Mocha), Dracula, Kanagawa (Wave, Dragon, Lotus), Tokyo Night, Rosé Pine (y Dawn), Gruvbox (oscuro y claro), Nord, Solarized (oscuro y claro), One Dark, Everforest, Monokai, GitHub oscuro, Como Firefox (copia los colores de tu tema) y Personalizado. Además puedes elegir color de acento, densidad, tamaño del texto y redondeo de esquinas.
 - **Teclado:** `Alt+Mayús+D` abre la ventanita. Dentro: `/` busca, `↑ ↓` te mueves, `Intro` va a la pestaña, `Supr` la cierra y `K` conserva solo esa.
 - **Exportar e importar** los ajustes.
 

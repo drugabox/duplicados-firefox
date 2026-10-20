@@ -293,17 +293,30 @@ const openPanel = async (focus) => {
 	}
 	// Si prefieres la ventana grande, el aviso también la usa.
 	if (settings.clickAction === "window") { await openWindow(); return; }
+	// Firefox no siempre deja abrir la ventanita sin que pulses el icono (según versión y ajustes,
+	// o si el botón está en el menú de desbordamiento). A veces ni siquiera da error: por eso se
+	// comprueba que de verdad se ha abierto y, si no, se abre la ventana grande.
 	try {
 		if (settings.clickAction !== "popup") await browser.browserAction.setPopup({ popup: POPUP_URL });
 		await browser.browserAction.openPopup();
-		return;
+		if (await waitForPort("popup", 1500)) return;
 	} catch {
-		/* Firefox antiguo o botón oculto: ventana aparte */
+		/* no se puede: ventana grande */
 	} finally {
 		if (settings.clickAction !== "popup") setTimeout(() => browser.browserAction.setPopup({ popup: "" }), 1500);
 	}
 	await openWindow();
 };
+
+const waitForPort = (kind, ms) => new Promise((resolve) => {
+	const start = Date.now();
+	const tick = () => {
+		if ([...ports].some(p => p.kind === kind)) resolve(true);
+		else if (Date.now() - start > ms) resolve(false);
+		else setTimeout(tick, 50);
+	};
+	tick();
+});
 
 const openWindow = async () => {
 	if (panelWindowId !== null) {
@@ -316,8 +329,8 @@ const openWindow = async () => {
 		} catch { panelWindowId = null; }
 	}
 	const { panelBounds } = await browser.storage.local.get("panelBounds");
-	const b = panelBounds || { width: 560, height: 840 };
-	const opts = { type: "popup", url: PAGE_URL + "?mode=window", width: b.width, height: b.height };
+	const b = panelBounds || { width: 460, height: 760 };
+	const opts = { type: "popup", url: browser.runtime.getURL(POPUP_URL) + "?mode=window", width: b.width, height: b.height };
 	if (Number.isFinite(b.left) && Number.isFinite(b.top)) { opts.left = b.left; opts.top = b.top; }
 	const w = await browser.windows.create(opts);
 	panelWindowId = w.id;

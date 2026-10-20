@@ -1,4 +1,4 @@
-/* Ventanita del icono: lo justo, limpio y directo. */
+/* Ventanita del icono (y ventana grande): como la original, una línea por pestaña. */
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -13,78 +13,89 @@ body {
 	flex-direction: column;
 	user-select: none;
 }
+:root[data-mode="window"] body { width: 100vw; height: 100vh; }
+:root[data-mode="window"] .grip, :root[data-mode="window"] #openWindow { display: none; }
 button, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Cabecera */
-.head { display: flex; align-items: center; gap: 6px; padding: 8px 6px 8px 12px; }
-.head strong { font-size: 1.05em; }
-.summary { color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--border); flex: none; }
+.count {
+	font-size: .82em; font-weight: 700; padding: 0 7px; border-radius: 999px;
+	background: color-mix(in srgb, var(--safe) 15%, transparent); color: var(--safe);
+}
+.count:empty { display: none; }
+.count.zero { background: var(--surface-2); color: var(--muted); }
+.spacer { flex: 1; }
 .icon {
 	width: 28px; height: 28px; display: grid; place-items: center; flex: none;
 	border: 0; background: none; border-radius: 6px; color: var(--muted); cursor: pointer;
 }
-.icon:hover { background: var(--surface-2); color: var(--text); }
+.icon:hover, .icon[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
 .icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* Acción principal */
-.bar { display: flex; gap: 6px; padding: 0 12px 8px; }
-.primary {
-	flex: 1; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-weight: 600;
-	background: var(--accent); color: var(--accent-text);
-}
-.primary:hover { filter: brightness(1.08); }
-.primary:disabled { background: var(--surface-2); color: var(--muted); cursor: default; filter: none; }
+/* Opciones rápidas (plegables, como en la original) */
+.opts { display: grid; gap: 6px; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border); flex: none; font-size: .92em; }
+.opts label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); }
+.opts select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; min-width: 50%; }
+.link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; text-align: left; justify-self: start; }
+.link:hover { text-decoration: underline; }
 
 .note {
-	margin: 0 12px 8px; padding: 6px 10px; border-radius: 6px; font-size: .92em;
-	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	margin: 6px 8px 0; padding: 5px 10px; border-radius: 6px; font-size: .92em; flex: none;
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* Lista */
-.list {
-	flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin;
-	border-top: 1px solid var(--border); outline: none;
-}
-.empty { padding: 26px 12px; text-align: center; color: var(--muted); }
+.list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; outline: none; padding: 2px 0; }
+.empty { padding: 26px 12px; text-align: center; color: var(--muted); font-style: italic; }
 
-.group { padding: 4px 0; border-bottom: 1px solid var(--border); }
-.group:last-child { border-bottom: 0; }
-.group.flash { animation: flash 1.8s ease-out 1; }
-@keyframes flash { 0%, 35% { background: color-mix(in srgb, var(--accent) 16%, transparent); } 100% { background: transparent; } }
-
-.ghead { display: flex; align-items: center; gap: 6px; padding: 2px 6px 2px 12px; color: var(--muted); font-size: .85em; }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--safe); flex: none; }
-.dudoso .dot { background: var(--doubt); }
-.gname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 1px 4px; border-radius: 4px; font-size: 1em; }
-.link:hover { background: var(--surface-2); }
+.group + .group { border-top: 1px solid var(--border); }
+.group.flash { animation: flash 2s ease-out 1; }
+@keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--accent) 18%, transparent); } 100% { background: transparent; } }
 
 .row {
-	display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 12px; cursor: pointer; outline: none;
+	display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 4px 0 10px;
+	cursor: pointer; outline: none; border-left: 3px solid transparent;
 }
 .row:hover, .row:focus-visible { background: var(--surface-2); }
-.row.new { box-shadow: inset 3px 0 0 var(--accent); }
-.fav { width: 16px; height: 16px; flex: none; border-radius: 3px; }
-.fav.letter { display: grid; place-items: center; font-size: 10px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
-.txt { flex: 1; min-width: 0; }
-.title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.diff { color: var(--muted); font-size: .82em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.fav { width: 14px; height: 14px; flex: none; border-radius: 3px; }
+.fav.letter { display: grid; place-items: center; font-size: 9px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Las que sobran, tachadas (como en la original); la que se conserva, normal. */
+.row.extra .title { color: color-mix(in srgb, var(--text) 58%, transparent); text-decoration: line-through; }
+.row.extra .fav { opacity: .6; }
+/* La pestaña que estás viendo */
+.row.active { border-left-color: var(--accent); }
+.row.active .title { font-weight: 600; }
+/* La que acabas de abrir */
+.row.new { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dudoso .row { border-left-color: color-mix(in srgb, var(--doubt) 70%, transparent); }
+.dudoso .row.active { border-left-color: var(--accent); }
+
 .tag { font-size: .78em; color: var(--muted); flex: none; }
-.tag.keep { color: var(--ok); }
-.tag.new { color: var(--accent); font-weight: 600; }
-.x { visibility: hidden; width: 24px; height: 24px; }
+.tag.new { color: var(--accent); font-weight: 700; }
+.x { visibility: hidden; width: 22px; height: 22px; }
 .row:hover .x, .row:focus-visible .x { visibility: visible; }
 .x:hover { color: var(--safe); }
 
-.more { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 7px 12px; color: var(--muted); cursor: pointer; text-align: left; }
-.more:hover { background: var(--surface-2); color: var(--text); }
+.section {
+	display: flex; align-items: center; gap: 6px; width: 100%; border: 0; border-top: 1px solid var(--border);
+	background: none; padding: 5px 12px; color: var(--muted); cursor: pointer; text-align: left; font-size: .9em;
+}
+.section:hover { color: var(--text); }
+.section .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--doubt); }
 
 /* Pie */
-.foot { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: .9em; flex-wrap: wrap; flex: none; }
-.foot select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 0; }
-.head, .bar, .note { flex: none; }
+.foot { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border); flex: none; }
+.close-all {
+	flex: 1; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-weight: 600;
+	background: var(--accent); color: var(--accent-text);
+}
+.close-all:hover { filter: brightness(1.08); }
+.close-all:disabled { background: var(--surface-2); color: var(--muted); cursor: default; filter: none; }
 
 /* Asa para estirar la ventanita */
 .grip { height: 9px; cursor: ns-resize; position: relative; flex: none; }
