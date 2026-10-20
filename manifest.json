@@ -24,7 +24,6 @@
     "scripts": [
       "lib/normalize.js",
       "lib/settings.js",
-      "lib/icons.js",
       "background.js"
     ]
   },

@@ -101,6 +101,9 @@ const loadContainers = async () => {
 
 // Agrupa las pestañas según un perfil de detección.
 const buildGroups = (all, profile) => {
+	// Orden de aparición: por ventana y, dentro de ella, de izquierda a derecha en la barra de pestañas.
+	// Así cada grupo lista sus pestañas en ese orden y los grupos salen según su primera pestaña.
+	all = all.slice().sort((a, b) => (a.windowId - b.windowId) || (a.index - b.index));
 	const items = [];
 	for (const t of all) {
 		if (!isTrackable(t) || ignoredTabs.has(t.id)) continue;
@@ -223,7 +226,7 @@ const updateBadge = () => {
 	} else if (settings.showZeroBadge) { text = "0"; color = settings.badgeZeroColor; }
 	browser.browserAction.setBadgeText({ text });
 	browser.browserAction.setBadgeBackgroundColor({ color });
-	if (browser.browserAction.setBadgeTextColor) browser.browserAction.setBadgeTextColor({ color: "#ffffff" });
+	if (browser.browserAction.setBadgeTextColor) browser.browserAction.setBadgeTextColor({ color: settings.badgeTextColor });
 	const parts = [];
 	parts.push(extra ? `${extra} pestaña${extra > 1 ? "s" : ""} duplicada${extra > 1 ? "s" : ""}` : "Sin duplicados");
 	if (doubtful) parts.push(`${doubtful} caso${doubtful > 1 ? "s" : ""} dudoso${doubtful > 1 ? "s" : ""}`);
@@ -253,7 +256,9 @@ const handlePendingChecks = async (allTabs) => {
 		const others = g.tabs.filter(t => t.id !== tabId);
 		const mode = settings.onDuplicate;
 
-		if (mode === "close" && g.level === "seguro" && !tab.pinned) {
+		// Cerrar solo pestañas nuevas de verdad; si una pestaña que ya tenías navega a un
+		// duplicado, se avisa, pero nunca se cierra sola (podría tener historial que importa).
+		if (mode === "close" && g.level === "seguro" && !tab.pinned && pending.isNew) {
 			const keep = others.find(t => t.id === chooseKeep(others)) || others[0];
 			await closeTabs([tabId], allTabs);
 			try {
@@ -261,7 +266,7 @@ const handlePendingChecks = async (allTabs) => {
 				await browser.windows.update(keep.windowId, { focused: true });
 			} catch { /* ya no existe */ }
 			notify(`Se cerró una pestaña duplicada`, `«${trim(tab.title, 70)}» ya estaba abierta. Pulsa aquí para deshacer o ver la lista.`, { groupId: g.id, tabId: keep.id });
-		} else if (mode === "panel" || (mode === "close" && g.level === "dudoso")) {
+		} else if (mode === "panel" || mode === "close") {
 			openPanel({ groupId: g.id, tabId });
 		} else if (mode === "notify") {
 			notify(g.level === "seguro" ? "Pestaña duplicada" : "Posible duplicado", `«${trim(tab.title, 70)}» ya está abierta${others.length > 1 ? ` (${others.length} veces)` : ""}. Pulsa para verla.`, { groupId: g.id, tabId });
@@ -493,6 +498,15 @@ const undo = async () => {
 
 // ------------------------------------------------------------------ eventos de pestañas
 
+// Cuándo se creó cada pestaña y cuándo se seleccionó o despertó por última vez.
+// Al seleccionar una pestaña dormida, Firefox la recarga y muchas webs cambian la dirección
+// un instante (redirecciones, avisos de cookies, inicio de sesión) antes de volver a la de
+// siempre. Ese rebote no es «abrir otra vez la página»: no debe avisar ni, sobre todo, cerrar.
+const createdAt = new Map();
+const wokeAt = new Map();
+const NEW_TAB_MS = 60000;   // solo se cierran solas las pestañas creadas hace menos de esto
+const WAKE_MS = 10000;      // cambios de dirección ignorados tras seleccionar o despertar una pestaña
+
 const markChanged = (tab) => {
 	if (!tab.url || !isTrackable(tab)) return;
 	const a = analyzeCached(tab.url);
@@ -500,7 +514,10 @@ const markChanged = (tab) => {
 	const key = scopeOf(tab) + "§" + a.strict;
 	if (lastKey.get(tab.id) === key) return;
 	lastKey.set(tab.id, key);
-	pendingChecks.set(tab.id, { key, at: Date.now() });
+	const now = Date.now();
+	const isNew = now - (createdAt.get(tab.id) || 0) < NEW_TAB_MS;
+	if (!isNew && now - (wokeAt.get(tab.id) || 0) < WAKE_MS) return;
+	pendingChecks.set(tab.id, { key, at: now, isNew });
 };
 
 browser.tabs.onCreated.addListener(async (tab) => {
@@ -509,11 +526,13 @@ browser.tabs.onCreated.addListener(async (tab) => {
 	createdBurst.push(now);
 	// Muchas pestañas a la vez = restaurar sesión o abrir un grupo de marcadores: no avisar.
 	if (createdBurst.length > 4) quietUntil = Math.max(quietUntil, now + 2500);
+	createdAt.set(tab.id, now);
 	markChanged(tab);
 	scheduleCompute();
 });
 
 browser.tabs.onUpdated.addListener(async (tabId, change, tab) => {
+	if (change.discarded === false) wokeAt.set(tabId, Date.now());
 	if (change.url) {
 		markChanged(tab);
 		scheduleCompute();
@@ -524,10 +543,11 @@ browser.tabs.onUpdated.addListener(async (tabId, change, tab) => {
 
 browser.tabs.onRemoved.addListener((tabId) => {
 	lastKey.delete(tabId); ignoredTabs.delete(tabId); intentional.delete(tabId); pendingChecks.delete(tabId);
+	createdAt.delete(tabId); wokeAt.delete(tabId);
 	scheduleCompute();
 });
 browser.tabs.onAttached.addListener(() => scheduleCompute());
-browser.tabs.onActivated.addListener(() => scheduleCompute(300));
+browser.tabs.onActivated.addListener(({ tabId }) => { wokeAt.set(tabId, Date.now()); scheduleCompute(300); });
 
 // ------------------------------------------------------------------ icono, atajos y menús
 
@@ -567,31 +587,8 @@ browser.menus.onClicked.addListener((info, tab) => {
 
 // ------------------------------------------------------------------ arranque
 
-// Icono de la barra: el diseño y color elegidos, dibujados a 16 y 32 px.
-let iconSig = "";
-const applyIcon = async () => {
-	const sig = settings.iconStyle + settings.iconColor;
-	if (sig === iconSig) return;
-	iconSig = sig;
-	try {
-		const img = new Image();
-		img.src = DupIcons.dataUrl(settings.iconStyle, settings.iconColor);
-		await img.decode();
-		const imageData = {};
-		for (const size of [16, 32, 64]) {
-			const c = document.createElement("canvas");
-			c.width = c.height = size;
-			const ctx = c.getContext("2d");
-			ctx.drawImage(img, 0, 0, size, size);
-			imageData[size] = ctx.getImageData(0, 0, size, size);
-		}
-		await browser.browserAction.setIcon({ imageData });
-	} catch (e) { console.warn("icono", e); }
-};
-
 const applySettings = (s) => {
 	settings = s;
-	applyIcon();
 	exclusions = DupSettings.compileExclusions(s.exclusions);
 	profile = DupNormalize.compile(DupSettings.profileOf(s));
 	applyClickAction();

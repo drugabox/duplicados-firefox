@@ -66,18 +66,18 @@ wiki.ejemplo.com mayusculas  no distingue mayúsculas en esa web
 ## Funciones
 
 - **Aviso al abrir un duplicado:** se abre la ventanita del icono y salta a esa pareja: la resalta y marca la pestaña «nueva». Necesita Firefox 149 o posterior; en versiones anteriores se abre una ventana aparte. En su lugar puedes elegir una notificación del sistema, no avisar, o cerrar la nueva automáticamente (y deshacer).
-- **Ventanita del icono, como la original:** una línea por pestaña; la que se conserva, normal, y las que sobran, en cursiva; la que estás viendo, destacada; la dirección al pasar el ratón. Cada fila tiene su × para cerrar esa pestaña concreta y ★ para conservarla y cerrar las demás de su grupo: eliges tú. Arriba, iconos discretos: cerrar duplicados, deshacer, ajustes, ventana propia y lista detallada en pestaña. Se estira arrastrando la barra de abajo o la esquina. **Firefox no deja que pase de 800 × 600 px** (límite fijo del navegador para todas las extensiones); para más, la ventana propia.
+- **Ventanita del icono, como la original:** una línea por pestaña, en el orden en que aparecen en la barra de pestañas; la que se conserva, normal, y las que sobran, en cursiva; la que estás viendo, destacada; la dirección al pasar el ratón. Cada fila tiene su × para cerrar esa pestaña concreta: eliges tú cuál. Arriba, iconos discretos: cerrar duplicados, deshacer, ventana propia, lista detallada y ajustes. Se estira arrastrando la barra de abajo o la esquina. **Firefox no deja que pase de 800 × 600 px** (límite fijo del navegador para todas las extensiones); para más, la ventana propia.
 - **Ventana grande** (botón ▭ de la ventanita, clic derecho en el icono, o como acción del icono): la misma lista sencilla en una ventana aparte, de tamaño libre, que recuerda su tamaño y posición. Si Firefox no deja abrir la ventanita al avisar de un duplicado, se abre esta automáticamente con la pareja seleccionada.
 - **Página completa en su propia pestaña** (botón ⤢ de la ventanita, o clic derecho en el icono): todos los datos, todos los ajustes y la ayuda. También funciona como **panel lateral** de Firefox.
 - **Lista clara:** resalta en cada URL la parte que cambia, explica el motivo, indica qué pestaña se conservará (★) y muestra la ventana, el contenedor, si está fijada, dormida o sonando.
 - **Cerrar duplicados** de golpe o por grupo, **conservar solo esta**, **Deshacer** (reabre con su historial).
 - **Mantener todas:** deja de avisar de esa página durante la sesión. Desde el clic derecho en una pestaña: «No es duplicada» y «Ver duplicados de esta pestaña».
-- **No molesta:** al restaurar la sesión o abrir muchas pestañas a la vez no avisa.
+- **No molesta:** al restaurar la sesión o abrir muchas pestañas a la vez no avisa. «Cerrar la nueva automáticamente» solo cierra pestañas recién creadas (menos de un minuto); si una pestaña que ya tenías acaba en un duplicado, avisa pero nunca la cierra. Seleccionar una pestaña dormida que recarga y cambia un instante de dirección no cuenta como abrirla otra vez.
 - **Respeta las sesiones:** las ventanas privadas y, por defecto, los contenedores distintos nunca se mezclan.
 - **Lista de exclusión** de webs, con comodines.
 - **Temas:** Automático (claro u oscuro según el sistema), Claro, Oscuro, Catppuccin (Latte, Frappé, Macchiato, Mocha), Dracula, Kanagawa (Wave, Dragon, Lotus), Tokyo Night, Rosé Pine (y Dawn), Gruvbox (oscuro y claro), Nord, Solarized (oscuro y claro), One Dark, Everforest, Monokai, GitHub oscuro, Como Firefox (copia los colores de tu tema) y Personalizado. Además puedes elegir color de acento, densidad, tamaño del texto y redondeo de esquinas.
 - **Teclado:** `Alt+Mayús+D` abre la ventanita. Dentro: `/` busca, `↑ ↓` te mueves, `Intro` va a la pestaña, `Supr` la cierra y `K` conserva solo esa.
-- **Icono de la barra personalizable:** 7 diseños y el color que quieras. El número puede contar duplicados + dudosos (por defecto), por separado (`5+2`) o solo duplicados, con colores a elegir.
+- **Número del icono, como en la original:** eliges el color del texto y el del fondo (con duplicados, con solo dudosos y sin duplicados). Puede contar duplicados + dudosos (por defecto), por separado (`5+2`) o solo duplicados.
 - **Exportar e importar** los ajustes.
 
 ## Instalación y actualizaciones automáticas

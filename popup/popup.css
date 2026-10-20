@@ -74,13 +74,9 @@ button, select { font: inherit; color: inherit; }
 
 .tag { font-size: .78em; color: var(--muted); flex: none; }
 .tag.new { color: var(--accent); font-weight: 700; }
-.x, .keep { width: 22px; height: 22px; }
-.x { opacity: .45; }
-.keep { visibility: hidden; }
+.x { width: 22px; height: 22px; opacity: .45; }
 .row:hover .x, .row:focus-visible .x { opacity: 1; }
-.row:hover .keep, .row:focus-visible .keep { visibility: visible; }
 .x:hover { color: var(--safe); }
-.keep:hover { color: var(--ok); }
 
 .section {
 	display: flex; align-items: center; gap: 6px; width: 100%; border: 0; border-top: 1px solid var(--border);

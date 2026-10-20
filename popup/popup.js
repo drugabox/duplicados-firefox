@@ -66,7 +66,6 @@ const renderGroup = (g) => {
 			h("span", { class: "title" }, t.title || t.url),
 			t.id === newTabId ? h("span", { class: "tag new" }, "nueva") : null,
 			t.pinned ? h("span", { class: "tag", title: "Fijada" }, "📌") : null,
-			h("button", { class: "icon keep", title: "Conservar esta y cerrar las demás del grupo", "aria-label": "Conservar esta", onclick: (e) => { e.stopPropagation(); send({ cmd: "keepOnly", groupId: g.id, tabId: t.id }); } }, svgIcon("M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z")),
 			h("button", { class: "icon x", title: "Cerrar esta pestaña", "aria-label": "Cerrar", onclick: (e) => { e.stopPropagation(); send({ cmd: "close", tabIds: [t.id] }); } }, svgIcon("M6 6l12 12M18 6L6 18")));
 	});
 	return h("div", { class: `group ${g.level}`, "data-id": g.id }, rows);
@@ -145,7 +144,6 @@ document.addEventListener("keydown", (e) => {
 	else if (e.key === "ArrowUp") { e.preventDefault(); (rows[i - 1] || rows[rows.length - 1])?.focus(); }
 	else if (i >= 0 && e.key === "Enter") go(Number(rows[i].dataset.tab));
 	else if (i >= 0 && (e.key === "Delete" || e.key === "Backspace")) { send({ cmd: "close", tabIds: [Number(rows[i].dataset.tab)] }); (rows[i + 1] || rows[i - 1])?.focus(); }
-	else if (i >= 0 && e.key.toLowerCase() === "k") send({ cmd: "keepOnly", groupId: rows[i].dataset.group, tabId: Number(rows[i].dataset.tab) });
 });
 
 // ------------------------------------------------------------------ tamaño

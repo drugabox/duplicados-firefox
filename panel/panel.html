@@ -75,7 +75,7 @@
 					<label class="choice"><input type="radio" name="onDuplicate" value="badge">
 						<span><strong>No avisar</strong><small>Solo se actualiza el número del icono.</small></span></label>
 					<label class="choice"><input type="radio" name="onDuplicate" value="close">
-						<span><strong>Cerrar la nueva automáticamente</strong><small>Te lleva a la que ya estaba abierta. Solo con duplicados seguros; se puede deshacer.</small></span></label>
+						<span><strong>Cerrar la nueva automáticamente</strong><small>Te lleva a la que ya estaba abierta. Solo cierra pestañas recién creadas y solo con duplicados seguros; si una pestaña que ya tenías acaba en un duplicado, te avisa pero no la cierra. Se puede deshacer.</small></span></label>
 				</div>
 				<label class="switch"><input type="checkbox" name="alertDoubtful"><span></span>Avisar también de los casos dudosos</label>
 			</section>
@@ -233,12 +233,7 @@
 			</section>
 
 			<section class="card">
-				<h2>Icono de la barra</h2>
-				<div class="icon-styles" id="iconStyles"></div>
-				<div class="field">
-					<span class="label">Color del icono</span>
-					<div class="row wrap" id="iconColors"><input type="color" name="iconColor" title="Otro color"></div>
-				</div>
+				<h2>Número del icono</h2>
 				<div class="field">
 					<span class="label">El número cuenta</span>
 					<div class="seg">
@@ -250,9 +245,10 @@
 				</div>
 				<span class="label">Colores del número</span>
 				<div class="badge-colors">
-					<label><input type="color" name="badgeColor"> Duplicados</label>
-					<label><input type="color" name="badgeDoubtColor"> Solo dudosos</label>
-					<label><input type="color" name="badgeZeroColor"> Sin duplicados</label>
+					<label><input type="color" name="badgeTextColor"> Texto</label>
+					<label><input type="color" name="badgeColor"> Fondo con duplicados</label>
+					<label><input type="color" name="badgeDoubtColor"> Fondo con solo dudosos</label>
+					<label><input type="color" name="badgeZeroColor"> Fondo sin duplicados</label>
 				</div>
 				<label class="switch"><input type="checkbox" name="badgeDoubtful"><span></span>Mostrar el número aunque solo haya dudosos</label>
 				<label class="switch"><input type="checkbox" name="showZeroBadge"><span></span>Mostrar «0» cuando no hay duplicados</label>
@@ -379,7 +375,6 @@
 	<script src="../lib/normalize.js"></script>
 	<script src="../lib/settings.js"></script>
 	<script src="../lib/theme.js"></script>
-	<script src="../lib/icons.js"></script>
 	<script src="panel.js"></script>
 </body>
 </html>
