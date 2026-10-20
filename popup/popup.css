@@ -26,6 +26,10 @@ button, select { font: inherit; color: inherit; }
 	background: color-mix(in srgb, var(--safe) 15%, transparent); color: var(--safe);
 }
 .count:empty { display: none; }
+.count.doubt { background: color-mix(in srgb, var(--doubt) 18%, transparent); color: var(--doubt); }
+.sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+.icon:disabled { opacity: .35; cursor: default; background: none; }
+#closeAll:not(:disabled):hover { color: var(--safe); }
 .count.zero { background: var(--surface-2); color: var(--muted); }
 .spacer { flex: 1; }
 .icon {
@@ -34,13 +38,6 @@ button, select { font: inherit; color: inherit; }
 }
 .icon:hover, .icon[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
 .icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-/* Opciones rápidas (plegables, como en la original) */
-.opts { display: grid; gap: 6px; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border); flex: none; font-size: .92em; }
-.opts label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); }
-.opts select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; min-width: 50%; }
-.link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; text-align: left; justify-self: start; }
-.link:hover { text-decoration: underline; }
 
 .note {
 	margin: 6px 8px 0; padding: 5px 10px; border-radius: 6px; font-size: .92em; flex: none;
@@ -64,8 +61,8 @@ button, select { font: inherit; color: inherit; }
 .fav.letter { display: grid; place-items: center; font-size: 9px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
 .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Las que sobran, tachadas (como en la original); la que se conserva, normal. */
-.row.extra .title { color: color-mix(in srgb, var(--text) 58%, transparent); text-decoration: line-through; }
+/* Las que sobran, en cursiva y atenuadas; la que se conserva, normal. */
+.row.extra .title { color: color-mix(in srgb, var(--text) 62%, transparent); font-style: italic; }
 .row.extra .fav { opacity: .6; }
 /* La pestaña que estás viendo */
 .row.active { border-left-color: var(--accent); }
@@ -77,9 +74,13 @@ button, select { font: inherit; color: inherit; }
 
 .tag { font-size: .78em; color: var(--muted); flex: none; }
 .tag.new { color: var(--accent); font-weight: 700; }
-.x { visibility: hidden; width: 22px; height: 22px; }
-.row:hover .x, .row:focus-visible .x { visibility: visible; }
+.x, .keep { width: 22px; height: 22px; }
+.x { opacity: .45; }
+.keep { visibility: hidden; }
+.row:hover .x, .row:focus-visible .x { opacity: 1; }
+.row:hover .keep, .row:focus-visible .keep { visibility: visible; }
 .x:hover { color: var(--safe); }
+.keep:hover { color: var(--ok); }
 
 .section {
 	display: flex; align-items: center; gap: 6px; width: 100%; border: 0; border-top: 1px solid var(--border);
@@ -87,15 +88,6 @@ button, select { font: inherit; color: inherit; }
 }
 .section:hover { color: var(--text); }
 .section .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--doubt); }
-
-/* Pie */
-.foot { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border); flex: none; }
-.close-all {
-	flex: 1; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-weight: 600;
-	background: var(--accent); color: var(--accent-text);
-}
-.close-all:hover { filter: brightness(1.08); }
-.close-all:disabled { background: var(--surface-2); color: var(--muted); cursor: default; filter: none; }
 
 /* Asa para estirar la ventanita */
 .grip { height: 9px; cursor: ns-resize; position: relative; flex: none; }

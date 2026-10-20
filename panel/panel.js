@@ -245,7 +245,7 @@ const renderGroup = (g, wins, multiWin) => {
 		if (t.active) chips.push(h("span", { class: "chip" }, "Visible"));
 		if (t.discarded) chips.push(h("span", { class: "chip", title: "Firefox la tiene descargada de memoria" }, "Dormida"));
 		if (t.audible) chips.push(h("span", { class: "chip" }, "🔊 Sonando"));
-		if (t.intentional) chips.push(h("span", { class: "chip", title: "Se abrió desde la misma página: no genera avisos" }, "Abierta a propósito"));
+		if (t.intentional) chips.push(h("span", { class: "chip", title: "Reabierta con «Deshacer»: no genera avisos" }, "Reabierta"));
 
 		const li = h("li", { class: "tab" + (t.id === highlightTabId ? " focused" : ""), tabindex: "0", dataset: { tab: t.id, group: g.id } },
 			favicon(t),
@@ -407,6 +407,16 @@ const CUSTOM_LABELS = { bg: "Fondo", surface: "Tarjetas", text: "Texto", muted: 
 const applyTheme = () => DupTheme.apply(settings, { fontSize: settings.fontSize });
 if (browser.theme && browser.theme.onUpdated) browser.theme.onUpdated.addListener(() => { if (settings.theme === "firefox") applyTheme(); });
 
+// Diseños y colores del icono de la barra.
+const renderIconOptions = () => {
+	$("#iconStyles").replaceChildren(...Object.entries(DupIcons.STYLES).map(([id, st]) =>
+		h("button", { type: "button", class: "icon-style", "aria-pressed": String(settings.iconStyle === id), title: st.name, onclick: () => save({ iconStyle: id }) },
+			h("img", { src: DupIcons.dataUrl(id, settings.iconColor), alt: "", width: "28", height: "28" }), h("span", {}, st.name))));
+	const picker = $('#iconColors input[type="color"]');
+	$("#iconColors").replaceChildren(...DupIcons.COLORS.map(c =>
+		h("button", { type: "button", class: "swatch", "aria-pressed": String(settings.iconColor.toLowerCase() === c), title: c, style: `background:${c}`, onclick: () => { save({ iconColor: c }); picker.value = c; } })), picker);
+};
+
 const renderThemes = () => {
 	const box = $("#themes");
 	box.replaceChildren(...THEMES.map(t => {
@@ -435,6 +445,7 @@ const save = (patch, delay = 0) => {
 	pendingPatch = { ...pendingPatch, ...patch };
 	applyTheme();
 	renderThemes();
+	renderIconOptions();
 	clearTimeout(saveTimer);
 	saveTimer = setTimeout(() => { const p = pendingPatch; pendingPatch = {}; DupSettings.save(p); }, delay);
 };
@@ -460,6 +471,7 @@ const fillForm = () => {
 	if (settings.preset === "personalizado") $("#advanced").open = true;
 	renderPresetSummary();
 	renderThemes();
+	renderIconOptions();
 };
 
 // Resumen en lenguaje llano de lo que hace el modo elegido.

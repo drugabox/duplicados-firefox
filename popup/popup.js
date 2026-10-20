@@ -57,19 +57,16 @@ const favicon = (t) => {
 
 const go = (tabId) => { send({ cmd: "activate", tabId }); if (mode === "popup") setTimeout(() => window.close(), 60); };
 
-// Al posarse encima: la dirección completa y, debajo, por qué se agrupa.
-const tooltip = (t, g) => [t.url, "", g.title + (g.details.length ? ": " + g.details.join(" ") : ""),
-	g.level === "seguro" && t.id === g.keepId ? "★ Es la que se conserva al cerrar duplicados." : ""].filter((x, i) => x || i === 1).join("\n").trim();
-
 const renderGroup = (g) => {
 	const rows = g.tabs.map(t => {
 		const extra = g.level === "seguro" && t.id !== g.keepId && !t.pinned;
 		const cls = ["row", extra ? "extra" : "", t.active ? "active" : "", t.id === newTabId ? "new" : ""].filter(Boolean).join(" ");
-		return h("div", { class: cls, tabindex: "0", "data-tab": t.id, title: tooltip(t, g), onclick: () => go(t.id) },
+		return h("div", { class: cls, tabindex: "0", "data-tab": t.id, "data-group": g.id, title: t.url, onclick: () => go(t.id) },
 			favicon(t),
 			h("span", { class: "title" }, t.title || t.url),
 			t.id === newTabId ? h("span", { class: "tag new" }, "nueva") : null,
 			t.pinned ? h("span", { class: "tag", title: "Fijada" }, "📌") : null,
+			h("button", { class: "icon keep", title: "Conservar esta y cerrar las demás del grupo", "aria-label": "Conservar esta", onclick: (e) => { e.stopPropagation(); send({ cmd: "keepOnly", groupId: g.id, tabId: t.id }); } }, svgIcon("M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z")),
 			h("button", { class: "icon x", title: "Cerrar esta pestaña", "aria-label": "Cerrar", onclick: (e) => { e.stopPropagation(); send({ cmd: "close", tabIds: [t.id] }); } }, svgIcon("M6 6l12 12M18 6L6 18")));
 	});
 	return h("div", { class: `group ${g.level}`, "data-id": g.id }, rows);
@@ -85,9 +82,11 @@ const render = () => {
 	count.textContent = closable ? String(closable) : doubt.length ? "" : "0";
 	count.className = "count" + (closable ? "" : " zero");
 	count.title = closable ? `${closable} pestaña${closable > 1 ? "s" : ""} de sobra` : "Sin duplicados";
+	$("#countDoubt").textContent = doubt.length ? doubt.length + "?" : "";
+	$("#countDoubt").title = `${doubt.length} caso${doubt.length === 1 ? "" : "s"} dudoso${doubt.length === 1 ? "" : "s"}`;
 	const btn = $("#closeAll");
 	btn.disabled = !closable;
-	btn.textContent = closable ? `Cerrar ${closable} duplicado${closable > 1 ? "s" : ""}` : "No hay duplicados";
+	btn.title = closable ? `Cerrar ${closable} duplicado${closable > 1 ? "s" : ""} (se conserva una de cada grupo)` : "No hay duplicados que cerrar";
 	$("#undo").hidden = !state.undo;
 
 	const list = $("#list");
@@ -137,24 +136,16 @@ $("#closeAll").addEventListener("click", () => send({ cmd: "closeAllSafe" }));
 $("#undo").addEventListener("click", () => send({ cmd: "undo" }));
 $("#openWindow").addEventListener("click", () => { send({ cmd: "openWindow" }); setTimeout(() => window.close(), 60); });
 $("#openTab").addEventListener("click", () => { send({ cmd: "openPage" }); if (mode === "popup") setTimeout(() => window.close(), 60); });
-$("#allSettings").addEventListener("click", () => { send({ cmd: "openPage", view: "ajustes" }); if (mode === "popup") setTimeout(() => window.close(), 60); });
-$("#toggleOpts").addEventListener("click", () => {
-	const open = $("#opts").hidden;
-	$("#opts").hidden = !open;
-	$("#toggleOpts").setAttribute("aria-expanded", String(open));
-	DupSettings.save({ popupOptsOpen: open });
-});
-$("#preset").addEventListener("change", (e) => DupSettings.save({ preset: e.target.value }));
-$("#onDuplicate").addEventListener("change", (e) => DupSettings.save({ onDuplicate: e.target.value }));
+$("#openSettings").addEventListener("click", () => { send({ cmd: "openPage", view: "ajustes" }); if (mode === "popup") setTimeout(() => window.close(), 60); });
 
 document.addEventListener("keydown", (e) => {
-	if (/^(SELECT|INPUT)$/.test(e.target.tagName)) return;
 	const rows = [...document.querySelectorAll(".row")];
 	const i = rows.indexOf(document.activeElement);
 	if (e.key === "ArrowDown") { e.preventDefault(); (rows[i + 1] || rows[0])?.focus(); }
 	else if (e.key === "ArrowUp") { e.preventDefault(); (rows[i - 1] || rows[rows.length - 1])?.focus(); }
 	else if (i >= 0 && e.key === "Enter") go(Number(rows[i].dataset.tab));
 	else if (i >= 0 && (e.key === "Delete" || e.key === "Backspace")) { send({ cmd: "close", tabIds: [Number(rows[i].dataset.tab)] }); (rows[i + 1] || rows[i - 1])?.focus(); }
+	else if (i >= 0 && e.key.toLowerCase() === "k") send({ cmd: "keepOnly", groupId: rows[i].dataset.group, tabId: Number(rows[i].dataset.tab) });
 });
 
 // ------------------------------------------------------------------ tamaño
@@ -213,10 +204,6 @@ if (mode === "window") {
 	settings = await DupSettings.load();
 	applySize();
 	await DupTheme.apply(settings, { fontSize: settings.popupFontSize });
-	$("#onDuplicate").value = settings.onDuplicate;
-	$("#preset").value = settings.preset;
-	$("#opts").hidden = !settings.popupOptsOpen;
-	$("#toggleOpts").setAttribute("aria-expanded", String(!!settings.popupOptsOpen));
 	let windowId = null;
 	try { windowId = (await browser.windows.getCurrent()).id; } catch { /* sin ventana */ }
 	send({ cmd: "hello", kind: mode, windowId: mode === "window" ? windowId : null });

@@ -14,7 +14,7 @@ let state = { groups: [], stats: { safe: 0, doubtful: 0, extra: 0, tabs: 0 }, un
 
 const ignoredTabs = new Set();      // "no es duplicada" para una pestaña concreta
 const ignoredGroups = new Set();    // "mantener ambas" para una página en esta sesión
-const intentional = new Set();      // abiertas a propósito desde la misma página (Duplicar pestaña...)
+const intentional = new Set();      // reabiertas con «Deshacer»: no vuelven a avisar
 const pendingChecks = new Map();    // tabId → momento en que cambió su dirección
 const lastKey = new Map();          // tabId → huella estricta anterior
 let undoStack = [];                 // última tanda de pestañas cerradas
@@ -214,9 +214,13 @@ const scheduleCompute = (delay = 120) => {
 const updateBadge = () => {
 	const { extra, doubtful } = state.stats;
 	let text = "", color = settings.badgeColor;
-	if (extra > 0) text = String(extra);
-	else if (doubtful > 0 && settings.badgeDoubtful) { text = "?"; color = settings.badgeDoubtColor; }
-	else if (settings.showZeroBadge) { text = "0"; color = settings.badgeZeroColor; }
+	const mode = settings.badgeCount;
+	if (extra > 0) {
+		text = mode === "sum" ? String(extra + doubtful) : mode === "split" && doubtful ? `${extra}+${doubtful}` : String(extra);
+	} else if (doubtful > 0 && settings.badgeDoubtful) {
+		text = mode === "safe" ? "?" : String(doubtful);
+		color = settings.badgeDoubtColor;
+	} else if (settings.showZeroBadge) { text = "0"; color = settings.badgeZeroColor; }
 	browser.browserAction.setBadgeText({ text });
 	browser.browserAction.setBadgeBackgroundColor({ color });
 	if (browser.browserAction.setBadgeTextColor) browser.browserAction.setBadgeTextColor({ color: "#ffffff" });
@@ -231,11 +235,17 @@ const updateBadge = () => {
 const handlePendingChecks = async (allTabs) => {
 	if (!pendingChecks.size) return;
 	const now = Date.now();
-	const checks = [...pendingChecks.keys()];
-	pendingChecks.clear();
-	if (now < quietUntil) return;
+	if (now < quietUntil) { pendingChecks.clear(); return; }
 
-	for (const tabId of checks) {
+	for (const [tabId, pending] of [...pendingChecks]) {
+		const current = allTabs.find(t => t.id === tabId);
+		if (!current) { pendingChecks.delete(tabId); continue; }
+		// Firefox puede tardar en dar la dirección definitiva de una pestaña nueva:
+		// si aún no coincide con la que provocó el aviso, se espera a la siguiente comprobación.
+		const a = current.url ? analyzeCached(current.url) : null;
+		const key = a && a.ok ? scopeOf(current) + "§" + a.strict : null;
+		if (key !== pending.key && now - pending.at < 15000) { scheduleCompute(500); continue; }
+		pendingChecks.delete(tabId);
 		const g = state.groups.find(x => x.level === "seguro" && !x.ignored && x.tabs.some(t => t.id === tabId))
 			|| (settings.alertDoubtful && state.groups.find(x => x.level === "dudoso" && !x.ignored && x.tabs.some(t => t.id === tabId)));
 		if (!g || intentional.has(tabId)) continue;
@@ -266,7 +276,7 @@ const notifyTargets = new Map();
 const notify = (title, message, focus) => {
 	const id = "dup-" + Date.now();
 	notifyTargets.set(id, focus);
-	browser.notifications.create(id, { type: "basic", iconUrl: browser.runtime.getURL("icons/icon.svg"), title, message });
+	browser.notifications.create(id, { type: "basic", iconUrl: browser.runtime.getURL("icons/icon-96.png"), title, message });
 };
 browser.notifications.onClicked.addListener((id) => {
 	openPanel(notifyTargets.get(id));
@@ -490,19 +500,7 @@ const markChanged = (tab) => {
 	const key = scopeOf(tab) + "§" + a.strict;
 	if (lastKey.get(tab.id) === key) return;
 	lastKey.set(tab.id, key);
-	pendingChecks.set(tab.id, Date.now());
-};
-
-// ¿Se abrió desde una pestaña con la misma página? Entonces es a propósito (Duplicar pestaña, etc.).
-const openerChecked = new Set();
-const checkOpener = async (tab) => {
-	if (tab.openerTabId == null || openerChecked.has(tab.id) || !tab.url || !analyzeCached(tab.url).ok) return;
-	openerChecked.add(tab.id);
-	try {
-		const opener = await browser.tabs.get(tab.openerTabId);
-		const a = analyzeCached(tab.url), b = analyzeCached(opener.url);
-		if (a.ok && b.ok && a.strict === b.strict) intentional.add(tab.id);
-	} catch { /* la de origen ya no existe */ }
+	pendingChecks.set(tab.id, { key, at: Date.now() });
 };
 
 browser.tabs.onCreated.addListener(async (tab) => {
@@ -511,14 +509,12 @@ browser.tabs.onCreated.addListener(async (tab) => {
 	createdBurst.push(now);
 	// Muchas pestañas a la vez = restaurar sesión o abrir un grupo de marcadores: no avisar.
 	if (createdBurst.length > 4) quietUntil = Math.max(quietUntil, now + 2500);
-	await checkOpener(tab);
 	markChanged(tab);
 	scheduleCompute();
 });
 
 browser.tabs.onUpdated.addListener(async (tabId, change, tab) => {
 	if (change.url) {
-		await checkOpener(tab);
 		markChanged(tab);
 		scheduleCompute();
 	} else if (change.title || change.favIconUrl || change.pinned !== undefined || change.discarded !== undefined || change.status === "complete") {
@@ -527,7 +523,7 @@ browser.tabs.onUpdated.addListener(async (tabId, change, tab) => {
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {
-	lastKey.delete(tabId); openerChecked.delete(tabId); ignoredTabs.delete(tabId); intentional.delete(tabId); pendingChecks.delete(tabId);
+	lastKey.delete(tabId); ignoredTabs.delete(tabId); intentional.delete(tabId); pendingChecks.delete(tabId);
 	scheduleCompute();
 });
 browser.tabs.onAttached.addListener(() => scheduleCompute());
@@ -571,8 +567,31 @@ browser.menus.onClicked.addListener((info, tab) => {
 
 // ------------------------------------------------------------------ arranque
 
+// Icono de la barra: el diseño y color elegidos, dibujados a 16 y 32 px.
+let iconSig = "";
+const applyIcon = async () => {
+	const sig = settings.iconStyle + settings.iconColor;
+	if (sig === iconSig) return;
+	iconSig = sig;
+	try {
+		const img = new Image();
+		img.src = DupIcons.dataUrl(settings.iconStyle, settings.iconColor);
+		await img.decode();
+		const imageData = {};
+		for (const size of [16, 32, 64]) {
+			const c = document.createElement("canvas");
+			c.width = c.height = size;
+			const ctx = c.getContext("2d");
+			ctx.drawImage(img, 0, 0, size, size);
+			imageData[size] = ctx.getImageData(0, 0, size, size);
+		}
+		await browser.browserAction.setIcon({ imageData });
+	} catch (e) { console.warn("icono", e); }
+};
+
 const applySettings = (s) => {
 	settings = s;
+	applyIcon();
 	exclusions = DupSettings.compileExclusions(s.exclusions);
 	profile = DupNormalize.compile(DupSettings.profileOf(s));
 	applyClickAction();

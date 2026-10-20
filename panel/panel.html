@@ -233,13 +233,28 @@
 			</section>
 
 			<section class="card">
-				<h2>Número del icono</h2>
+				<h2>Icono de la barra</h2>
+				<div class="icon-styles" id="iconStyles"></div>
+				<div class="field">
+					<span class="label">Color del icono</span>
+					<div class="row wrap" id="iconColors"><input type="color" name="iconColor" title="Otro color"></div>
+				</div>
+				<div class="field">
+					<span class="label">El número cuenta</span>
+					<div class="seg">
+						<label><input type="radio" name="badgeCount" value="sum"><span>Duplicados + dudosos</span></label>
+						<label><input type="radio" name="badgeCount" value="split"><span>Por separado (5+2)</span></label>
+						<label><input type="radio" name="badgeCount" value="safe"><span>Solo duplicados</span></label>
+					</div>
+					<small class="hint">El número es el de pestañas que sobran. «Duplicados + dudosos» suma también los casos dudosos; si solo hay dudosos, se muestra en su color.</small>
+				</div>
+				<span class="label">Colores del número</span>
 				<div class="badge-colors">
 					<label><input type="color" name="badgeColor"> Duplicados</label>
 					<label><input type="color" name="badgeDoubtColor"> Solo dudosos</label>
 					<label><input type="color" name="badgeZeroColor"> Sin duplicados</label>
 				</div>
-				<label class="switch"><input type="checkbox" name="badgeDoubtful"><span></span>Mostrar «?» cuando solo hay dudosos</label>
+				<label class="switch"><input type="checkbox" name="badgeDoubtful"><span></span>Mostrar el número aunque solo haya dudosos</label>
 				<label class="switch"><input type="checkbox" name="showZeroBadge"><span></span>Mostrar «0» cuando no hay duplicados</label>
 			</section>
 
@@ -342,7 +357,6 @@
 				<li>Pestañas vacías o de «Nueva pestaña».</li>
 				<li>Páginas internas de Firefox y de otras extensiones (grupos de <strong>Sidebery</strong> o Tree Style Tab, pestañas suspendidas…) salvo que su dirección sea exactamente la misma, letra por letra. Nunca se las une por título.</li>
 				<li>La misma página en <strong>ventanas privadas</strong> y normales, ni (por defecto) en <strong>contenedores</strong> distintos: son sesiones diferentes.</li>
-				<li>Pestañas abiertas a propósito desde la misma página (por ejemplo con «Duplicar pestaña»): aparecen en la lista, pero no generan avisos.</li>
 				<li>Las webs que añadas a la lista de exclusión.</li>
 			</ul>
 		</section>
@@ -365,6 +379,7 @@
 	<script src="../lib/normalize.js"></script>
 	<script src="../lib/settings.js"></script>
 	<script src="../lib/theme.js"></script>
+	<script src="../lib/icons.js"></script>
 	<script src="panel.js"></script>
 </body>
 </html>
